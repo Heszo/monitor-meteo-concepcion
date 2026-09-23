@@ -34,8 +34,15 @@ st.markdown("""<style>
 # ------------------------------------------------------------------ caché
 # 'clave' (año-mes-día-hora) solo sirve para renovar la caché cada hora.
 @st.cache_data(ttl=TTL, show_spinner="Descargando METAR de Carriel Sur…")
-def carga_metar(horas, clave):
+def _carga_metar(horas, clave):
     return F.metar("SCIE", horas)
+
+
+def carga_metar(horas, clave):
+    try:
+        return _carga_metar(horas, clave)
+    except Exception:  # noqa: BLE001
+        return pd.DataFrame()
 
 
 @st.cache_data(ttl=TTL, show_spinner="Descargando estaciones VIPNet…")
@@ -43,14 +50,40 @@ def carga_vipnet(variable, horas, clave):
     return F.vipnet_variable(variable, horas)
 
 
-@st.cache_data(ttl=TTL, show_spinner="Descargando los 7 modelos…")
-def carga_deterministas(lat, lon, pasado, futuro, clave):
-    return F.deterministas(lat, lon, pasado, futuro)
+@st.cache_data(ttl=900, show_spinner="Leyendo los pronósticos publicados…")
+def carga_publicados(clave15):
+    return F.lee_pronosticos()
 
 
-@st.cache_data(ttl=TTL, show_spinner="Descargando el super-ensamble (143 miembros)…")
-def carga_ensamble(lat, lon, pasado, futuro, clave):
-    return F.ensamble(lat, lon, pasado, futuro)
+@st.cache_data(ttl=TTL, show_spinner="Consultando Open-Meteo en vivo…")
+def carga_vivo(lat, lon, pasado, futuro, clave):
+    return F.pronostico_vivo(lat, lon, pasado, futuro)
+
+
+VACIO = {"det": {}, "pct": {}, "pp": None, "raf6h": None}
+VIEJO = pd.Timedelta(hours=3)
+
+
+def pronostico(s, pasado, futuro):
+    """(pronóstico, origen, error). Primero la copia que publica la GitHub Action cada hora; si falta
+    o tiene más de 3 h, Open-Meteo en vivo; si eso también falla, la copia vieja o nada.
+    Las funciones con caché lanzan la excepción (así no se cachea una falla) y se atrapa aquí."""
+    ahora_utc = pd.Timestamp.now(tz="UTC")
+    clave15 = ahora_utc.floor("15min").isoformat()
+    try:
+        generado, pub = carga_publicados(clave15)
+    except Exception:  # noqa: BLE001
+        generado, pub = None, {}
+    local = lambda t: t.tz_convert(F.ZONA).strftime("%d/%m %H:%M")  # noqa: E731
+    if generado is not None and s["id"] in pub and ahora_utc - generado < VIEJO:
+        return pub[s["id"]], f"copia publicada a las {local(generado)}", None
+    try:
+        return carga_vivo(s["lat"], s["lon"], pasado, futuro, ahora_utc.strftime("%Y%m%d%H")), \
+            "Open-Meteo en vivo", None
+    except Exception as ex:  # noqa: BLE001
+        if generado is not None and s["id"] in pub:
+            return pub[s["id"]], f"copia publicada a las {local(generado)} (desactualizada)", str(ex)
+        return VACIO, None, str(ex)
 
 
 def barra(boton="resetScale2d"):
@@ -87,6 +120,8 @@ with st.sidebar:
     if st.button("Forzar actualización"):
         st.cache_data.clear()
     st.caption("Los datos se renuevan solos cada hora.")
+    st.markdown("[Código en GitHub](https://github.com/Heszo/monitor-meteo-concepcion) · "
+                "[github.com/Heszo](https://github.com/Heszo)")
 
 sitio = F.SITIO[sitio_id]
 ahora = F.ahora_local()
@@ -95,9 +130,14 @@ horas_obs = pasado * 24 + 2
 t0 = pd.Timestamp(ahora).floor("h") - pd.Timedelta(days=pasado)
 
 metar = carga_metar(max(horas_obs, 30), clave)
-det = carga_deterministas(sitio["lat"], sitio["lon"], pasado, futuro, clave)
-ens = carga_ensamble(sitio["lat"], sitio["lon"], pasado, futuro, clave)  # la pestaña Lluvia lo usa siempre
+pron, origen_pron, error_pron = pronostico(sitio, pasado, futuro)
+det, pct = pron["det"], pron["pct"]
+t_fin = pd.Timestamp(ahora).floor("D") + pd.Timedelta(days=futuro)
 avisos = []
+
+
+def det_var(v):
+    return det.get(v, pd.DataFrame())
 
 
 def observado(s, variable):
@@ -113,12 +153,22 @@ def observado(s, variable):
 
 
 def recorta(df):
-    return None if df is None else df[df.index >= t0]
+    if df is None or df.empty:
+        return df
+    return df[(df.index >= t0) & (df.index < t_fin)]
 
 
 # ------------------------------------------------------------------ encabezado
 st.markdown("## Monitor meteorológico · Gran Concepción")
 st.markdown("Observado en estaciones y pronóstico de 7 modelos globales y un super-ensamble de 143 miembros")
+if error_pron and origen_pron is None:
+    st.warning("No se pudo obtener el pronóstico (Open-Meteo no respondió y todavía no hay copia publicada). "
+               "Se muestran solo las observaciones; vuelve a intentar en unos minutos.  \n"
+               f"Detalle: `{error_pron[:160]}`")
+elif error_pron:
+    st.info(f"Open-Meteo no respondió; se muestra la {origen_pron}.")
+with st.sidebar:
+    st.caption(f"Pronóstico: {origen_pron or 'no disponible'}.")
 
 if not metar.empty:
     ult = metar.iloc[-1]
@@ -157,14 +207,17 @@ if vista == VISTAS[0]:
         acumular = st.toggle("Mostrar acumulado desde el inicio de la ventana", value=False)
     histograma = var == "precipitacion" and not acumular
 
-    mod_df = recorta(det[var][[m for m in modelos if m in det[var]]])
+    dv = det_var(var)
+    mod_df = recorta(dv[[m for m in modelos if m in dv]])
     obs = recorta(observado(sitio, var))
-    miembros = recorta(ens.get(var)) if con_ensamble else None
+    banda = None
     if acumular:
         mod_df = mod_df.fillna(0).cumsum()
-        miembros = miembros.fillna(0).cumsum() if miembros is not None else None
         obs = obs.cumsum() if obs is not None else None
-    banda = F.percentiles(miembros)
+        if con_ensamble and pron["pp"] is not None:
+            banda = F.percentiles(recorta(pron["pp"]).fillna(0).cumsum())
+    elif con_ensamble and pct.get(var) is not None:
+        banda = recorta(pct[var])
     unidad = "mm" if acumular else V["unidad"]
 
     # en el histograma de lluvia, el valor de T es lo caído en (T-1h, T]: escalón "vh" y barras
@@ -214,7 +267,7 @@ if vista == VISTAS[0]:
                 f"horas ya ocurridas de la ventana ({pasado} días)")
     if obs is not None and len(obs) and not acumular:
         tabla = F.verificacion(mod_df, obs, var, pd.Timestamp(ahora))
-        if miembros is not None and banda is not None:
+        if banda is not None:
             t_ens = F.verificacion(banda[["p50"]].rename(columns={"p50": "super-ensamble"}), obs, var,
                                    pd.Timestamp(ahora))
             tabla = pd.concat([tabla, t_ens]).sort_values("mae")
@@ -263,9 +316,9 @@ if vista == VISTAS[1]:
     ini = t0
     obs_ll = {i: o[o.index > ini] for i, o in lluvia_obs.items()}
     tot = {i: float(o.sum()) for i, o in obs_ll.items()}
-    P = ens.get("precipitacion")
+    P = recorta(pron["pp"])
     P = P[P.index > ini] if P is not None else None
-    R = ens.get("rafaga")
+    R = pron["raf6h"]
 
     st.caption(f"Lluvia observada desde el {DIAS[ini.weekday()]} {ini:%d/%m %H:%M} (inicio de la ventana; "
                f"se cambia con «Días hacia atrás») y pronóstico del super-ensamble en {sitio['nombre']}.")
@@ -357,9 +410,8 @@ if vista == VISTAS[1]:
             m = (P.index > b0) & (P.index <= b1)
             q10, q50, q90 = np.percentile(P[m].sum().values, [10, 50, 90])
             rf = None
-            if R is not None and not R.empty:
-                mr = (R.index > b0) & (R.index <= b1)
-                rf = np.nanpercentile(R[mr].max().values, 50) if mr.any() else None
+            if R is not None and b0 in R.index:
+                rf = float(R.loc[b0])
             pasado_b, actual = b1 <= ahora_h, b0 <= ahora_h < b1
             color = next(cc for lim, _, cc in NIVELES_6H if q50 < lim)
             obs_txt = ""
@@ -411,7 +463,8 @@ if vista == VISTAS[2]:
     etiqueta_mod = "mediana de modelos" if fuente_mod == "mediana" else F.MODELOS[fuente_mod][0]
 
     def serie_mod(v):
-        df = recorta(det[v][[m for m in modelos if m in det[v]]])
+        dv = det_var(v)
+        df = recorta(dv[[m for m in modelos if m in dv]])
         if df is None or df.empty:
             return None
         if fuente_mod != "mediana":
@@ -424,8 +477,8 @@ if vista == VISTAS[2]:
     ya = set()
     for fila, v in enumerate(filas, start=1):
         leyenda = lambda nombre: nombre not in ya and not ya.add(nombre)  # noqa: E731
-        if con_ensamble and v in ens:
-            b = F.percentiles(recorta(ens[v]))
+        if con_ensamble and pct.get(v) is not None:
+            b = recorta(pct[v])
             if b is not None:
                 fm.add_trace(go.Scatter(x=np.r_[b.index, b.index[::-1]], y=np.r_[b.p90, b.p10[::-1]],
                                         fill="toself", fillcolor=BANDA, line=dict(width=0), hoverinfo="skip",
@@ -548,7 +601,14 @@ en las coordenadas del sitio elegido, en la hora local de Chile.
 - Intensidades y valores son descriptivos: no reemplazan los avisos oficiales de SENAPRED y la DMC.
 - Open-Meteo es gratuito para uso no comercial.
 
-Bruno Herrera · METGEO. Consultado el {ahora:%d/%m/%Y %H:%M} (hora de Chile).
+Hecho por Bruno Herrera · METGEO ([github.com/Heszo](https://github.com/Heszo)). Código abierto (MIT) en
+[github.com/Heszo/monitor-meteo-concepcion](https://github.com/Heszo/monitor-meteo-concepcion).
+Consultado el {ahora:%d/%m/%Y %H:%M} (hora de Chile); pronóstico: {origen_pron or "no disponible"}.
+
+**Cómo se actualiza el pronóstico.** Open-Meteo gratuito limita las consultas por dirección IP, y la de
+Streamlit Community Cloud es compartida con muchas otras apps. Por eso una GitHub Action baja los
+pronósticos de todos los sitios cada hora y los publica en la rama `datos` del repositorio; la app lee esa
+copia y solo consulta Open-Meteo en vivo si la copia falta o tiene más de 3 horas.
 """)
     for v in ("precipitacion", "temperatura", "humedad"):
         avisos.extend(carga_vipnet(v, horas_obs, clave)[1])

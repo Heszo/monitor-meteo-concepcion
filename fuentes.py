@@ -9,6 +9,8 @@ horaria, en pasos horarios. El valor de la hora T es:
 - el resto: el valor instantáneo más cercano a T (media de la hora que termina en T
   para las estaciones VIPNet, que miden cada 30 min).
 """
+import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -208,55 +210,86 @@ def metar(estacion="SCIE", horas=72):
 
 
 # ------------------------------------------------------------------ Open-Meteo
+# Open-Meteo gratuito limita las consultas por IP. En Streamlit Community Cloud la IP es compartida
+# con otras apps y suele estar agotada (HTTP 429), así que la app lee los pronósticos que una GitHub
+# Action publica cada hora en la rama "datos" (ver actualiza_pronosticos.py) y solo consulta en vivo
+# si esa copia falta o está vieja.
+REPO = "Heszo/monitor-meteo-concepcion"
+URL_PUBLICADOS = os.environ.get("MONITOR_DATOS", f"https://raw.githubusercontent.com/{REPO}/datos")  # URL o carpeta
+DIAS_PUBLICADOS = 7  # pasado y futuro guardados en la copia publicada (el máximo de la barra lateral)
+
+
+class OpenMeteoError(RuntimeError):
+    pass
+
+
+def _get_json(url, params, intentos=4, timeout=60):
+    """GET con reintentos ante 429, errores 5xx, cortes y respuestas que no son JSON."""
+    ultimo = ""
+    for k in range(intentos):
+        try:
+            r = requests.get(url, params=params, headers=UA, timeout=timeout)
+            if r.status_code == 429 or r.status_code >= 500:
+                ultimo = f"HTTP {r.status_code}"
+            else:
+                r.raise_for_status()
+                return r.json()
+        except (requests.Timeout, requests.ConnectionError, ValueError) as ex:
+            ultimo = type(ex).__name__
+        except requests.HTTPError as ex:  # 4xx distinto de 429: no tiene sentido reintentar
+            raise OpenMeteoError(f"{url.split('/')[2]}: {ex.response.status_code} {ex.response.text[:200]}") from None
+        if k < intentos - 1:
+            time.sleep(2 * 2 ** k)
+    raise OpenMeteoError(f"{url.split('/')[2]}: {ultimo} tras {intentos} intentos")
+
+
 def _params(lat, lon, variables, pasado, futuro):
     return dict(latitude=lat, longitude=lon, hourly=",".join(variables), past_days=int(pasado),
                 forecast_days=int(futuro), timezone="America/Santiago", wind_speed_unit="kmh")
 
 
+def _serie(valores):
+    return np.array([np.nan if x is None else x for x in valores], float)
+
+
 def deterministas(lat, lon, pasado, futuro):
     """{variable: DataFrame(tiempo x modelo)} de los 7 modelos deterministas."""
     oms = [v["om"] for v in VARIABLES.values()]
-    r = requests.get(URL_OM, params=_params(lat, lon, oms, pasado, futuro) | {"models": ",".join(MODELOS)},
-                     headers=UA, timeout=60)
-    r.raise_for_status()
-    h = r.json()["hourly"]
+    h = _get_json(URL_OM, _params(lat, lon, oms, pasado, futuro) | {"models": ",".join(MODELOS)})["hourly"]
     t = pd.to_datetime(h["time"])
     salida = {}
     for clave, v in VARIABLES.items():
-        cols = {}
-        for m in MODELOS:
-            serie = np.array([np.nan if x is None else x for x in h.get(f"{v['om']}_{m}", [])], float)
-            if serie.size and np.isfinite(serie).any():
-                cols[m] = serie
-        salida[clave] = pd.DataFrame(cols, index=t)
+        cols = {m: _serie(h[f"{v['om']}_{m}"]) for m in MODELOS if f"{v['om']}_{m}" in h}
+        salida[clave] = pd.DataFrame({m: x for m, x in cols.items() if np.isfinite(x).any()}, index=t)
     return salida
 
 
 def ensamble(lat, lon, pasado, futuro):
     """{variable: DataFrame(tiempo x miembro)} del super-ensamble (los 4
-    centros juntos). La dirección se omite: sus percentiles no tienen sentido."""
+    centros juntos). La dirección se omite: sus percentiles no tienen sentido.
+    Si un centro no responde se sigue con los demás; si no responde ninguno, error."""
     claves = [k for k, v in VARIABLES.items() if not v.get("sin_ensamble")]
     oms = [VARIABLES[k]["om"] for k in claves]
 
     def uno(modelo):
-        r = requests.get(URL_ENS, params=_params(lat, lon, oms, pasado, futuro) | {"models": modelo},
-                         headers=UA, timeout=90)
-        if not r.ok:
-            return None
-        return r.json()["hourly"]
+        try:
+            return modelo, _get_json(URL_ENS, _params(lat, lon, oms, pasado, futuro) | {"models": modelo},
+                                     timeout=90)["hourly"]
+        except OpenMeteoError:
+            return modelo, None
 
     with ThreadPoolExecutor(max_workers=4) as pool:
-        respuestas = [h for h in pool.map(uno, ENSAMBLES) if h]
+        respuestas = [(m, h) for m, h in pool.map(uno, ENSAMBLES) if h]
     if not respuestas:
-        return {}
-    t = pd.to_datetime(respuestas[0]["time"])
+        raise OpenMeteoError("ensemble-api.open-meteo.com: ningún centro respondió")
+    t = pd.to_datetime(respuestas[0][1]["time"])
     salida = {}
     for clave, om in zip(claves, oms):
         cols = {}
-        for h, modelo in zip(respuestas, ENSAMBLES):
+        for modelo, h in respuestas:
             for k, valores in h.items():
                 if k == om or k.startswith(om + "_member"):
-                    serie = np.array([np.nan if x is None else x for x in valores], float)
+                    serie = _serie(valores)
                     if np.isfinite(serie).any():
                         cols[f"{modelo}:{k}"] = serie
         salida[clave] = pd.DataFrame(cols, index=t)
@@ -268,6 +301,90 @@ def percentiles(miembros, qs=(10, 50, 90)):
         return None
     return pd.DataFrame({f"p{q}": np.nanpercentile(miembros.values, q, axis=1) for q in qs},
                         index=miembros.index)
+
+
+def resumen_pronostico(det, ens):
+    """Lo que la app usa de un sitio: deterministas, percentiles del ensamble
+    por variable, los miembros de lluvia (para acumulados y bloques) y la
+    ráfaga de cada bloque de 6 h (mediana entre miembros del máximo del bloque)."""
+    raf = ens.get("rafaga")
+    raf6h = None
+    if raf is not None and not raf.empty:
+        raf6h = raf.resample("6h", origin="start_day", closed="right", label="left").max().median(axis=1)
+    return {"det": det, "pct": {k: percentiles(v) for k, v in ens.items()},
+            "pp": ens.get("precipitacion"), "raf6h": raf6h}
+
+
+def pronostico_vivo(lat, lon, pasado, futuro, exige_ensamble=True):
+    """Resumen de un sitio en vivo. Con exige_ensamble=False, si el ensamble no responde se
+    devuelven igual los 7 modelos (sin banda ni miembros de lluvia)."""
+    det = deterministas(lat, lon, pasado, futuro)
+    try:
+        ens = ensamble(lat, lon, pasado, futuro)
+    except OpenMeteoError:
+        if exige_ensamble:
+            raise
+        ens = {}
+    return resumen_pronostico(det, ens)
+
+
+# --- copia publicada: 4 tablas parquet con columnas "sitio|variable|serie"
+def guarda_pronosticos(por_sitio, carpeta, generado):
+    import json
+    from pathlib import Path
+
+    carpeta = Path(carpeta)
+    carpeta.mkdir(parents=True, exist_ok=True)
+    tablas = {"det": {}, "pct": {}, "pp": {}, "raf6h": {}}
+    for sid, r in por_sitio.items():
+        for var, df in r["det"].items():
+            for c in df:
+                tablas["det"][f"{sid}|{var}|{c}"] = df[c]
+        for var, df in r["pct"].items():
+            if df is not None:
+                for c in df:
+                    tablas["pct"][f"{sid}|{var}|{c}"] = df[c]
+        if r["pp"] is not None:
+            for c in r["pp"]:
+                tablas["pp"][f"{sid}|precipitacion|{c}"] = r["pp"][c]
+        if r["raf6h"] is not None:
+            tablas["raf6h"][f"{sid}|rafaga|p50"] = r["raf6h"]
+    for nombre, cols in tablas.items():
+        pd.DataFrame(cols).astype("float32").to_parquet(carpeta / f"{nombre}.parquet", compression="zstd")
+    (carpeta / "meta.json").write_text(json.dumps({"generado": generado, "sitios": sorted(por_sitio)}))
+
+
+def _desarma(df):
+    """{sitio: {variable: DataFrame(tiempo x serie)}} desde columnas 'sitio|variable|serie'."""
+    salida = {}
+    for col in df.columns:
+        sid, var, serie = col.split("|", 2)
+        salida.setdefault(sid, {}).setdefault(var, {})[serie] = df[col].astype(float)
+    return {sid: {v: pd.DataFrame(c) for v, c in vs.items()} for sid, vs in salida.items()}
+
+
+def lee_pronosticos(base=URL_PUBLICADOS):
+    """(generado, {sitio: resumen}) desde la copia publicada (URL o carpeta)."""
+    import io
+    import json
+    from pathlib import Path
+
+    def lee(nombre):
+        if str(base).startswith("http"):
+            r = requests.get(f"{base}/{nombre}", headers=UA, timeout=30)
+            r.raise_for_status()
+            return r.content
+        return (Path(base) / nombre).read_bytes()
+
+    meta = json.loads(lee("meta.json"))
+    t = {n: _desarma(pd.read_parquet(io.BytesIO(lee(f"{n}.parquet")))) for n in ("det", "pct", "pp", "raf6h")}
+    por_sitio = {}
+    for sid in meta["sitios"]:
+        pp = t["pp"].get(sid, {}).get("precipitacion")
+        raf = t["raf6h"].get(sid, {}).get("rafaga")
+        por_sitio[sid] = {"det": t["det"].get(sid, {}), "pct": t["pct"].get(sid, {}), "pp": pp,
+                          "raf6h": raf["p50"] if raf is not None else None}
+    return pd.Timestamp(meta["generado"]), por_sitio
 
 
 # ------------------------------------------------------------------ verificación

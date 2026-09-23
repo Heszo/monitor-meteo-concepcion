@@ -1,12 +1,15 @@
 # Monitor meteorológico · Gran Concepción
 
+**App en línea: [metgeo-concepcion.streamlit.app](https://metgeo-concepcion.streamlit.app/)** ·
+por Bruno Herrera · METGEO ([github.com/Heszo](https://github.com/Heszo))
+
 App Streamlit que junta en un solo lugar lo **observado** en las estaciones del Gran Concepción y lo
 **pronosticado** por 7 modelos globales y un super-ensamble de 143 miembros, para lluvia, temperatura,
 humedad, viento, ráfagas, dirección del viento y presión. Sirve para ver qué viene y, sobre todo,
 para **comparar modelos entre sí y contra la observación**.
 
-Se actualiza sola: descarga los datos al abrirse y los guarda en caché una hora. No necesita claves
-ni base de datos.
+Se actualiza sola y no necesita claves ni base de datos: las observaciones se descargan al abrir la app
+(caché de una hora) y los pronósticos los publica cada hora una GitHub Action (ver más abajo).
 
 ## Vistas
 
@@ -38,13 +41,31 @@ Advertencias:
 - Es una herramienta de divulgación: no reemplaza los avisos de SENAPRED ni de la DMC.
 - Open-Meteo es gratuito para uso no comercial.
 
+## Cómo se actualizan los pronósticos
+
+Open-Meteo gratuito limita las consultas por dirección IP, y la IP de Streamlit Community Cloud es
+compartida con muchas otras apps: consultado desde ahí suele responder `429 Too Many Requests`. Por eso:
+
+1. La GitHub Action [`pronosticos.yml`](.github/workflows/pronosticos.yml) corre cada hora (minuto 17),
+   ejecuta `actualiza_pronosticos.py` para los 17 sitios (7 días atrás y 7 adelante) y publica 4 archivos
+   parquet más `meta.json` en la rama [`datos`](../../tree/datos). La rama se reescribe en cada corrida,
+   sin historial, así el repositorio no crece.
+2. La app lee esa copia. Si falta o tiene más de 3 horas, consulta Open-Meteo en vivo (con reintentos);
+   si tampoco responde, muestra un aviso y sigue mostrando las observaciones.
+
+Para forzar una actualización: pestaña *Actions* → *Actualizar pronósticos* → *Run workflow*.
+GitHub pausa las Actions programadas de un repositorio público tras 60 días sin actividad; si pasa,
+basta reactivarla desde la misma pestaña.
+
 ## Estructura
 
 ```
-app.py              interfaz (Streamlit + Plotly)
-fuentes.py          descarga y ordena los datos; catálogo de variables, modelos y estaciones
-.streamlit/         tema de la app
-requirements.txt    dependencias
+app.py                     interfaz (Streamlit + Plotly)
+fuentes.py                 descarga y ordena los datos; catálogo de variables, modelos y estaciones
+actualiza_pronosticos.py   baja los pronósticos de todos los sitios (lo corre la GitHub Action)
+.github/workflows/         Action horaria que publica los pronósticos en la rama "datos"
+.streamlit/                tema de la app
+requirements.txt           dependencias
 ```
 
 Para agregar o quitar estaciones, o cambiar qué variables mide cada una, editar `SITIOS` en
@@ -59,6 +80,9 @@ python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
+Para usar una copia local de los pronósticos (por ejemplo, recién generada con
+`python actualiza_pronosticos.py salida`), definir `MONITOR_DATOS=salida` antes de lanzar la app.
+
 ## Publicar en Streamlit Community Cloud (gratis)
 
 1. Entrar a [share.streamlit.io](https://share.streamlit.io) con la cuenta de GitHub.
@@ -69,4 +93,4 @@ La app se duerme tras unos días sin visitas; la primera visita la despierta.
 
 ## Autoría y licencia
 
-Bruno Herrera · METGEO. Código bajo licencia [MIT](LICENSE).
+Bruno Herrera · METGEO · [github.com/Heszo](https://github.com/Heszo). Código bajo licencia [MIT](LICENSE).

@@ -15,11 +15,11 @@ Se actualiza sola y no necesita claves ni base de datos: las observaciones se de
 
 | Vista | Qué muestra |
 |---|---|
+| **Presentación** | Portada: qué es el proyecto, las condiciones de ahora, lo que viene en 24 h y los próximos 3 días, accesos a cada vista, cómo funciona, fuentes y advertencias. |
 | **Comparar modelos** | Una variable a la vez en el sitio elegido: los 7 modelos, la banda p10–p90 del super-ensamble y lo observado. Debajo, una tabla con sesgo, MAE, RMSE y correlación de cada modelo en las horas ya ocurridas. La lluvia se dibuja como histograma horario. |
 | **Lluvia** | Mapa satelital con el acumulado observado por estación, histograma horario (mediana y p10–p90 del ensamble contra el observado por grupo o estación), acumulado y tarjetas de lluvia esperada cada 6 h con ráfaga. |
 | **Meteograma** | Las 6 variables apiladas en un mismo eje de tiempo, para un modelo o la mediana de los modelos elegidos. |
 | **Mapa de estaciones** | Última medición (o lluvia acumulada en las últimas N horas) de cada estación sobre imagen satelital. |
-| **Acerca de** | Fuentes y advertencias. |
 
 Los modelos se consultan en las coordenadas del sitio elegido en la barra lateral.
 

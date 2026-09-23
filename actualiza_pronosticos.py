@@ -8,35 +8,51 @@ hora y publica el resultado en la rama "datos", que es lo que lee la app.
 """
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import fuentes as F
 
+EN_PARALELO = 3          # sitios a la vez: Open-Meteo a veces tarda ~1 min por sitio
+PRESUPUESTO_S = 15 * 60  # pasado este tiempo se publica lo que haya (el job corta a los 30 min)
+
 
 def main(carpeta):
+    inicio = time.monotonic()
     por_sitio, pendientes = {}, list(F.SITIOS)
-    # 1ª pasada exige el ensamble; la 2ª, un par de minutos después, acepta quedarse solo con
-    # los 7 modelos para los sitios cuyo ensamble siga sin responder
+
+    def uno(s, exige):
+        if time.monotonic() - inicio > PRESUPUESTO_S:
+            return s, None, "sin tiempo"
+        try:
+            return s, F.pronostico_vivo(s["lat"], s["lon"], F.DIAS_PUBLICADOS, F.DIAS_PUBLICADOS,
+                                        exige_ensamble=exige), None
+        except F.OpenMeteoError as ex:
+            return s, None, str(ex)
+
+    # 1ª pasada exige el ensamble; la 2ª acepta quedarse solo con los 7 modelos
     for pasada, exige in ((1, True), (2, False)):
-        if pasada == 2 and pendientes:
-            time.sleep(90)
-        fallas = []
-        for s in pendientes:
-            try:
-                por_sitio[s["id"]] = F.pronostico_vivo(s["lat"], s["lon"], F.DIAS_PUBLICADOS,
-                                                       F.DIAS_PUBLICADOS, exige_ensamble=exige)
-                sin_ens = " (sin ensamble)" if por_sitio[s["id"]]["pp"] is None else ""
-                print(f"ok    [{pasada}] {s['nombre']}{sin_ens}")
-            except F.OpenMeteoError as ex:
-                fallas.append(s)
-                print(f"falla [{pasada}] {s['nombre']}: {ex}")
-            time.sleep(1)  # sin apuro: se corre una vez por hora
-        pendientes = fallas
-    fallas = [s["nombre"] for s in pendientes]
+        if not pendientes:
+            break
+        if pasada == 2:
+            time.sleep(60)
+        with ThreadPoolExecutor(max_workers=EN_PARALELO) as pool:
+            resultados = list(pool.map(lambda s: uno(s, exige), pendientes))
+        pendientes = []
+        for s, r, err in resultados:
+            if r is None:
+                pendientes.append(s)
+                print(f"falla [{pasada}] {s['nombre']}: {err}")
+            else:
+                por_sitio[s["id"]] = r
+                print(f"ok    [{pasada}] {s['nombre']}{' (sin ensamble)' if r['pp'] is None else ''}")
+
     if not por_sitio:
         sys.exit("Ningún sitio respondió; se mantiene la copia publicada anterior.")
     F.guarda_pronosticos(por_sitio, carpeta, datetime.now(timezone.utc).isoformat(timespec="seconds"))
-    print(f"Guardado en {carpeta}: {len(por_sitio)} sitios" + (f" (fallaron: {', '.join(fallas)})" if fallas else ""))
+    faltan = ", ".join(s["nombre"] for s in pendientes)
+    print(f"Guardado en {carpeta}: {len(por_sitio)} sitios en {time.monotonic() - inicio:.0f} s"
+          + (f" (fallaron: {faltan})" if faltan else ""))
 
 
 if __name__ == "__main__":

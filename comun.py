@@ -28,6 +28,8 @@ HORAS_OBS = F.DIAS_PUBLICADOS * 24 + 2
 VARS_VIPNET = ("precipitacion", "temperatura", "humedad")
 VACIO = {"det": {}, "pct": {}, "pp": None, "raf6h": None}
 VIEJO = pd.Timedelta(hours=3)
+INSTAGRAM = "https://www.instagram.com/metgeo.spa/"
+LINKEDIN = "https://www.linkedin.com/company/metgeo-spa/"
 
 
 # ------------------------------------------------------------------ cargas con caché
@@ -161,30 +163,67 @@ def nombre_modelo(m):
 
 
 def metricas_ahora(c):
-    """Última observación de Carriel Sur (METAR) y lluvia de 24 h en Concepción DGA."""
-    metar = c.metar
-    if metar.empty:
-        st.caption("Sin METAR reciente de Carriel Sur.")
-        return
-    ult = metar.iloc[-1]
-    hace3 = metar.loc[metar.index <= metar.index[-1] - pd.Timedelta(hours=3), "presion"]
-    tend = ult.presion - hace3.iloc[-1] if len(hace3) else np.nan
-    lluvia, _ = vipnet_seguro("precipitacion")
-    pp24 = lluvia.get("concepcion")
-    pp24 = pp24[pp24.index > pp24.index.max() - pd.Timedelta(hours=24)].sum() if pp24 is not None else np.nan
-    st.caption(f"Ahora en Carriel Sur · METAR de las {metar.index[-1]:%H:%M} del {metar.index[-1]:%d/%m} "
-               f"(hora de Chile) · `{ult.texto}`")
+    """Última observación del sitio elegido. Lo que el sitio no mide se toma de una estación de
+    respaldo (viento, ráfaga y presión: Carriel Sur, la única que los mide; lluvia: Concepción) y la
+    tarjeta lo dice."""
+    sitio, metar = c.sitio, c.metar
+    cs, cc = F.SITIO["carrielsur"], F.SITIO["concepcion"]
+
+    def ultimo(s, variable):
+        """(valor, hora, sitio de origen) de la última medición; si s no la mide, de la estación de
+        respaldo. (nan, None, None) si no hay dato."""
+        if variable not in s["vars"]:
+            s = cc if variable == "precipitacion" else cs
+        o = c.observado(s, variable)
+        o = None if o is None else o.dropna()
+        if o is None or o.empty:
+            return np.nan, None, s
+        return float(o.iloc[-1]), o.index[-1], s
+
+    def titulo(nombre, s):
+        return nombre if s is sitio else f"{nombre} · {F.etiqueta(s)}"
+
+    horas = []
+    tarjetas = []
+    for var, nombre, dec, unidad, icono in [
+        ("temperatura", "Temperatura", 0, "°C", "thermostat"),
+        ("humedad", "Humedad", 0, "%", "humidity_percentage"),
+        ("viento", "Viento", 0, "km/h", "air"),
+        ("rafaga", "Ráfaga", 0, "km/h", "storm"),
+        ("presion", "Presión", 0, "hPa", "speed"),
+    ]:
+        v, h, s = ultimo(sitio, var)
+        if s is sitio and h is not None:
+            horas.append(h)
+        delta = None
+        if var == "viento":
+            delta = F.cardinal(ultimo(sitio, "direccion")[0])
+        elif var == "presion" and h is not None:
+            p = c.observado(s, "presion").dropna()
+            hace3 = p[p.index <= h - pd.Timedelta(hours=3)]
+            delta = f"{v - hace3.iloc[-1]:+.0f} hPa en 3 h" if len(hace3) else None
+        valor = "sin ráfagas" if var == "rafaga" and np.isnan(v) and not metar.empty else fmt(v, dec, unidad)
+        tarjetas.append((titulo(nombre, s), valor, delta, icono))
+
+    s_ll = sitio if "precipitacion" in sitio["vars"] else cc
+    pp = c.observado(s_ll, "precipitacion")
+    pp24 = np.nan if pp is None or pp.empty else pp[pp.index > pp.index.max() - pd.Timedelta(hours=24)].sum()
+    if s_ll is sitio and pp is not None and not pp.empty:
+        horas.append(pp.index.max())
+    tarjetas.append((titulo("Lluvia 24 h", s_ll), fmt(pp24, 1, "mm"), None, "rainy"))
+
+    if horas:
+        h = max(horas)
+        st.caption(f"Ahora en {F.etiqueta(sitio)} · última medición a las {h:%H:%M} del {h:%d/%m} "
+                   "(hora de Chile). Las tarjetas que nombran otra estación son variables que este sitio no mide.")
+    else:
+        st.caption(f"Sin mediciones recientes de {F.etiqueta(sitio)}; se muestran las de las estaciones "
+                   "de respaldo.")
     # fila horizontal: se reparte en varias líneas sola en pantallas angostas
     with st.container(horizontal=True, gap="small"):
-        st.metric("Temperatura", fmt(ult.temperatura, 0, "°C"), border=True, icon=":material/thermostat:")
-        st.metric("Humedad", fmt(ult.humedad, 0, "%"), border=True, icon=":material/humidity_percentage:")
-        st.metric("Viento", fmt(ult.viento, 0, "km/h"), F.cardinal(ult.direccion), delta_color="off",
-                  delta_arrow="off", border=True, icon=":material/air:")
-        st.metric("Ráfaga", fmt(ult.rafaga, 0, "km/h") if not np.isnan(ult.rafaga) else "sin ráfagas",
-                  border=True, icon=":material/storm:")
-        st.metric("Presión", fmt(ult.presion, 0, "hPa"), None if np.isnan(tend) else f"{tend:+.0f} hPa en 3 h",
-                  delta_color="off", border=True, icon=":material/speed:")
-        st.metric("Lluvia 24 h (Concepción DGA)", fmt(pp24, 1, "mm"), border=True, icon=":material/rainy:")
+        for nombre, valor, delta, icono in tarjetas:
+            st.metric(nombre, valor, delta, delta_color="off", delta_arrow="off", border=True,
+                      icon=f":material/{icono}:")
 
 
 # ------------------------------------------------------------------ controles
@@ -193,7 +232,7 @@ def controles():
     "Ajustes". Arma y devuelve el contexto de la corrida. Sitio y días quedan en la URL para
     compartir la vista; modelos y banda se conservan al cambiar de página."""
     with st.container(horizontal=True, vertical_alignment="bottom", gap="small"):
-        sitio_id = st.selectbox("Sitio", [s["id"] for s in F.SITIOS], format_func=lambda i: F.SITIO[i]["nombre"],
+        sitio_id = st.selectbox("Sitio", [s["id"] for s in F.SITIOS], format_func=lambda i: F.etiqueta(F.SITIO[i]),
                                 key="sitio", bind="query-params", width=290,
                                 help="Los modelos se consultan en las coordenadas del sitio elegido.")
         with st.popover("Ajustes", icon=":material/tune:"):

@@ -33,8 +33,7 @@ st.markdown(f"""
     Monitor meteorológico del Gran Concepción</div>
   <div style="font-size:2.9rem;font-weight:800;line-height:1.1;margin:.35rem 0 .8rem">MetGeo Concepción</div>
   <div style="font-size:1.15rem;max-width:46rem;opacity:.95;line-height:1.5">
-Lo que está pasando y lo que viene, contado a la vez por las estaciones de la zona y por
-los principales modelos del mundo. Y, sobre todo, <b>qué tan bien le está acertando cada modelo</b>.</div>
+Estaciones locales, modelos globales y verificación de pronósticos en un solo lugar.</div>
   <div style="display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.4rem">
 {"".join(f'<span style="background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);'
          f'border-radius:999px;padding:.35rem .9rem;font-size:.92rem"><b>{a}</b> {b}</span>'
@@ -169,6 +168,9 @@ with st.container(horizontal=True, vertical_alignment="center", gap="large"):
         "Hecho por **Bruno Herrera** · MetGeo Spa  \n"
         ":material/code: [github.com/Heszo](https://github.com/Heszo) · código abierto (MIT) en "
         "[github.com/Heszo/monitor-meteo-concepcion](https://github.com/Heszo/monitor-meteo-concepcion)")
+    with st.container(horizontal=True, gap="small", width="content"):
+        st.link_button("Instagram @metgeo.spa", C.INSTAGRAM, icon=":material/photo_camera:")
+        st.link_button("LinkedIn MetGeo Spa", C.LINKEDIN, icon=":material/work:")
 st.caption(f"Consultado el {ahora:%d/%m/%Y %H:%M} (hora de Chile) · pronóstico: "
            f"{origen_pron or 'no disponible'}. Open-Meteo gratuito limita las consultas por IP, así que los "
            "pronósticos los publica cada hora una GitHub Action y la app lee esa copia.")

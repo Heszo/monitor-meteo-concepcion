@@ -37,5 +37,6 @@ pagina.run()
 
 if pagina.title != INICIO.title:  # la portada ya trae su propia firma
     st.space("large")
-    st.caption("MetGeo Concepción · Bruno Herrera · [github.com/Heszo](https://github.com/Heszo) · "
+    st.caption("MetGeo Concepción · Bruno Herrera · [Instagram](" + C.INSTAGRAM + ") · [LinkedIn](" + C.LINKEDIN +
+               ") · [github.com/Heszo](https://github.com/Heszo) · "
                "[código abierto](https://github.com/Heszo/monitor-meteo-concepcion)", text_alignment="center")

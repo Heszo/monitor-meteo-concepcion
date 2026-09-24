@@ -61,10 +61,10 @@ ENSAMBLES = ["gfs_seamless", "ecmwf_ifs025", "icon_seamless", "gem_global"]  # 3
 # Sitios: la estación METAR del aeropuerto y las estaciones VIPNet del Gran
 # Concepción. "vars" = variables que mide (verificado el 23/09/2026).
 SITIOS = [
-    dict(id="carrielsur", nombre="Carriel Sur (aeropuerto)", fuente="metar", codigo="SCIE",
+    dict(id="carrielsur", nombre="Carriel Sur", fuente="metar", codigo="SCIE",
          lat=-36.7727, lon=-73.0631, grupo="ciudad",
          vars=["temperatura", "humedad", "viento", "rafaga", "direccion", "presion"]),
-    dict(id="concepcion", nombre="Concepción DGA", fuente="vipnet", codigo="08410001-3",
+    dict(id="concepcion", nombre="Concepción", fuente="vipnet", codigo="08410001-3",
          lat=-36.8332, lon=-73.1005, grupo="ciudad", vars=["temperatura", "humedad", "precipitacion"]),
     dict(id="nonguen", nombre="Nonguén", fuente="vipnet", codigo="08220008-8",
          lat=-36.8202, lon=-73.0164, grupo="ciudad", vars=["precipitacion"]),
@@ -99,6 +99,12 @@ SITIOS = [
 ]
 SITIO = {s["id"]: s for s in SITIOS}
 GRUPOS = {"costa": "#00797C", "ciudad": "#E0701A", "interior": "#6B3FA0"}
+SIGLA = {"metar": "DMC", "vipnet": "DGA"}  # quién opera la estación, para las etiquetas
+
+
+def etiqueta(s):
+    """'Santa Juana (DGA)': nombre del sitio y, entre paréntesis, la sigla de la fuente."""
+    return f"{s['nombre']} ({SIGLA[s['fuente']]})"
 
 
 def ahora_local():

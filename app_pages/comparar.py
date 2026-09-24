@@ -20,7 +20,7 @@ var = st.segmented_control("Variable", list(F.VARIABLES), default="temperatura",
 V = F.VARIABLES[var]
 acumular = False
 if var == "precipitacion":
-    acumular = st.toggle("Mostrar acumulado desde el inicio de la ventana", value=False)
+    acumular = st.toggle("Mostrar acumulado desde el inicio de la ventana", value=False, key="acumulado")
 histograma = var == "precipitacion" and not acumular
 
 dv = det_var(var)
@@ -74,7 +74,7 @@ fig.update_xaxes(**EJE_T)
 st.plotly_chart(fig, config=barra())
 if obs is None:
     disponibles = [F.SITIO[s["id"]]["nombre"] for s in F.SITIOS if var in s["vars"]]
-    st.info(f"{sitio['nombre']} no mide {V['nombre'].lower()}. "
+    st.info(icon=":material/sensors_off:", body=f"{sitio['nombre']} no mide {V['nombre'].lower()}. "
             + (f"Sitios que sí: {', '.join(disponibles)}." if disponibles else
                "Ninguna estación abierta del Gran Concepción la mide."))
 

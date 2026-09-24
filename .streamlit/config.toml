@@ -1,9 +1,10 @@
 [theme]
 base = "light"
-primaryColor = "#1F5A96"
+primaryColor = "#004090"     # azul del logo MetGeo
 
 [server]
 headless = true
+enableStaticServing = true   # sirve static/ en app/static/ (foto de portada y logos)
 
 [runner]
 # con ttl de 15 min, lo vencido se sigue sirviendo (mientras se refresca) hasta 45 min

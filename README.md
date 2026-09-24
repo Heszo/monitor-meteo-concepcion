@@ -1,7 +1,9 @@
-# Monitor meteorológico · Gran Concepción
+# MetGeo Concepción
+
+Monitor meteorológico del Gran Concepción.
 
 **App en línea: [metgeo-concepcion.streamlit.app](https://metgeo-concepcion.streamlit.app/)** ·
-por Bruno Herrera · METGEO ([github.com/Heszo](https://github.com/Heszo))
+por Bruno Herrera · MetGeo Spa ([github.com/Heszo](https://github.com/Heszo))
 
 App Streamlit que junta en un solo lugar lo **observado** en las estaciones del Gran Concepción y lo
 **pronosticado** por 7 modelos globales y un super-ensamble de 143 miembros, para lluvia, temperatura,
@@ -15,7 +17,7 @@ Se actualiza sola y no necesita claves ni base de datos: las observaciones se de
 
 | Vista | Qué muestra |
 |---|---|
-| **Presentación** | Portada: qué es el proyecto, las condiciones de ahora, lo que viene en 24 h y los próximos 3 días, accesos a cada vista, cómo funciona, fuentes y advertencias. |
+| **Home** | Portada: qué es el proyecto, las condiciones de ahora, lo que viene en 24 h y los próximos 3 días, accesos a cada vista, cómo funciona, fuentes y advertencias. |
 | **Comparar modelos** | Una variable a la vez en el sitio elegido: los 7 modelos, la banda p10–p90 del super-ensamble y lo observado. Debajo, una tabla con sesgo, MAE, RMSE y correlación de cada modelo en las horas ya ocurridas. La lluvia se dibuja como histograma horario. |
 | **Lluvia** | Mapa satelital con el acumulado observado por estación, histograma horario (mediana y p10–p90 del ensamble contra el observado por grupo o estación), acumulado y tarjetas de lluvia esperada cada 6 h con ráfaga. |
 | **Meteograma** | Las 6 variables apiladas en un mismo eje de tiempo, para un modelo o la mediana de los modelos elegidos. |
@@ -68,7 +70,8 @@ fuentes.py                 descarga y ordena los datos; catálogo de variables, 
 actualiza_pronosticos.py   baja los pronósticos de todos los sitios (lo corre la GitHub Action)
 tests/                     pruebas de humo con st.testing.AppTest
 .github/workflows/         Actions: pronósticos cada hora y pruebas en cada push
-.streamlit/                tema y configuración de la caché
+.streamlit/                tema, archivos estáticos y configuración de la caché
+static/                    foto de portada (cerro Caracol) y logos de MetGeo, servidos en app/static/
 requirements.txt           dependencias
 ```
 
@@ -115,4 +118,5 @@ La app se duerme tras unos días sin visitas; la primera visita la despierta.
 
 ## Autoría y licencia
 
-Bruno Herrera · METGEO · [github.com/Heszo](https://github.com/Heszo). Código bajo licencia [MIT](LICENSE).
+Bruno Herrera · MetGeo Spa · [github.com/Heszo](https://github.com/Heszo). Código bajo licencia [MIT](LICENSE).
+Logos de MetGeo Spa y foto del cerro Caracol: todos los derechos reservados, no incluidos en la licencia MIT.

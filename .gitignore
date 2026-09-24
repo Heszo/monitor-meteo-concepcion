@@ -11,3 +11,6 @@ __pycache__/
 *.pyc
 *.swp
 .DS_Store
+
+# originales pesados (6000 px, SVG con metadatos): la app usa las versiones livianas de static/
+images/

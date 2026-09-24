@@ -9,13 +9,8 @@ import comun as C
 import fuentes as F
 from comun import BANDA, DIAS, EJE_T, NEGRO, ROJO, barra, fmt, linea_ahora, nombre_modelo
 
-c = C.contexto()
-sitio, pasado, futuro, modelos, con_ensamble = c.sitio, c.pasado, c.futuro, c.modelos, c.con_ensamble
-ahora, t0, t_fin, metar, pron, det, pct, avisos = c.ahora, c.t0, c.t_fin, c.metar, c.pron, c.det, c.pct, c.avisos
-origen_pron = c.origen_pron
-observado, recorta, det_var = c.observado, c.recorta, c.det_var
 
-TESELA_PORTADA = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/10/624/304"
+FOTO_PORTADA = "app/static/caracol.jpg"  # cerro Caracol, Concepción (servida desde static/)
 TARJETAS = [
     ("Comparar modelos", "comparar", ":material/stacked_line_chart:",
      "Una variable a la vez: los 7 modelos, la banda del super-ensamble y lo observado. Debajo, qué modelo "
@@ -31,12 +26,12 @@ TARJETAS = [
 ]
 
 st.markdown(f"""
-<div style="border-radius:18px;padding:2.6rem 2.4rem 2.2rem;margin:.4rem 0 1.6rem;color:white;
-        background:linear-gradient(120deg,rgba(9,30,58,.88) 35%,rgba(31,90,150,.45)),
-                   url('{TESELA_PORTADA}') center/cover;">
-  <div style="font-size:.85rem;letter-spacing:.12em;text-transform:uppercase;opacity:.8">METGEO · monitor abierto</div>
-  <div style="font-size:2.5rem;font-weight:800;line-height:1.15;margin:.35rem 0 .7rem">
-Monitor meteorológico<br>del Gran Concepción</div>
+<div style="position:relative;border-radius:18px;padding:3rem 2.4rem 2.4rem;margin:.4rem 0 1.4rem;color:white;
+        background:linear-gradient(115deg,rgba(0,32,80,.90) 30%,rgba(0,64,144,.40)),
+                   url('{FOTO_PORTADA}') center 60%/cover;">
+  <div style="font-size:.85rem;letter-spacing:.12em;text-transform:uppercase;opacity:.85">
+    Monitor meteorológico del Gran Concepción</div>
+  <div style="font-size:2.9rem;font-weight:800;line-height:1.1;margin:.35rem 0 .8rem">MetGeo Concepción</div>
   <div style="font-size:1.15rem;max-width:46rem;opacity:.95;line-height:1.5">
 Lo que está pasando y lo que viene, contado a la vez por las estaciones de la zona y por
 los principales modelos del mundo. Y, sobre todo, <b>qué tan bien le está acertando cada modelo</b>.</div>
@@ -46,10 +41,14 @@ los principales modelos del mundo. Y, sobre todo, <b>qué tan bien le está acer
          for a, b in [("17", "sitios de observación"), ("7", "variables"), ("7", "modelos globales"),
                       ("143", "miembros de ensamble"), ("cada hora", "se actualiza")])}
   </div>
+  <div style="position:absolute;right:1rem;bottom:.6rem;font-size:.72rem;opacity:.7">Foto: cerro Caracol, Concepción</div>
 </div>""", unsafe_allow_html=True)
 
 # --- ahora mismo
-st.markdown("### Ahora mismo")
+st.subheader("Ahora mismo", icon=":material/schedule:", anchor=False)
+c = C.controles()
+sitio, ahora, metar, pron, avisos = c.sitio, c.ahora, c.metar, c.pron, c.avisos
+origen_pron, observado, det_var = c.origen_pron, c.observado, c.det_var
 C.metricas_ahora(c)
 ahora_h = pd.Timestamp(ahora).floor("h")
 prox = lambda df: df[(df.index > ahora_h) & (df.index <= ahora_h + pd.Timedelta(hours=24))]  # noqa: E731
@@ -58,15 +57,15 @@ raf = det_var("rafaga")
 if not temp.empty:
     st.markdown(f"**Próximas 24 horas en {sitio['nombre']}** (mediana de los 7 modelos; la lluvia, del "
                 "super-ensamble)")
-    c = st.columns(4)
+    fila = st.container(horizontal=True, gap="small")
     tm = prox(temp).median(axis=1)
-    c[0].metric("Temperatura mínima", fmt(tm.min(), 0, "°C"))
-    c[1].metric("Temperatura máxima", fmt(tm.max(), 0, "°C"))
-    c[2].metric("Ráfaga máxima", fmt(prox(raf).median(axis=1).max(), 0, "km/h") if not raf.empty else "—")
+    fila.metric("Temperatura mínima", fmt(tm.min(), 0, "°C"), border=True)
+    fila.metric("Temperatura máxima", fmt(tm.max(), 0, "°C"), border=True)
+    fila.metric("Ráfaga máxima", fmt(prox(raf).median(axis=1).max(), 0, "km/h") if not raf.empty else "—", border=True)
     if pron["pp"] is not None:
         ll = prox(pron["pp"]).sum().values
         q10, q50, q90 = np.percentile(ll, [10, 50, 90])
-        c[3].metric("Lluvia esperada", fmt(q50, 0, "mm"), f"rango {q10:.0f}–{q90:.0f} mm", delta_color="off")
+        fila.metric("Lluvia esperada", fmt(q50, 0, "mm"), f"rango {q10:.0f}–{q90:.0f} mm", delta_color="off", border=True)
 
     # adelanto: 24 h hacia atrás y 72 h hacia adelante
     ventana = lambda df: df[(df.index > ahora_h - pd.Timedelta(hours=24)) &  # noqa: E731
@@ -95,10 +94,10 @@ if not temp.empty:
                      legend=dict(orientation="h", y=-0.25, yanchor="top"))
     fp.update_xaxes(**EJE_T)
     st.plotly_chart(fp, config=barra(), key="adelanto")
-    st.caption("El sitio se cambia en la barra lateral. La línea punteada roja marca la hora actual.")
+    st.caption("El sitio se cambia arriba, en «Sitio». La línea punteada roja marca la hora actual.")
 
 # --- qué se puede hacer
-st.markdown("### Qué puedes hacer aquí")
+st.subheader("Qué puedes hacer aquí", icon=":material/explore:", anchor=False)
 cols = st.columns(4)
 for col, (nombre, archivo, icono, texto) in zip(cols, TARJETAS):
     with col.container(border=True, height=235):
@@ -107,7 +106,7 @@ for col, (nombre, archivo, icono, texto) in zip(cols, TARJETAS):
         st.page_link(f"app_pages/{archivo}.py", label="Abrir", icon=icono, width="stretch")
 
 # --- cómo funciona
-st.markdown("### Cómo funciona")
+st.subheader("Cómo funciona", icon=":material/settings_suggest:", anchor=False)
 col_red, col_pasos = st.columns([5, 6], gap="large")
 with col_red:
     fred = go.Figure()
@@ -136,13 +135,13 @@ with col_pasos:
     ]:
         st.markdown(
             f'<div style="display:flex;gap:1rem;align-items:flex-start;margin-bottom:1.1rem">'
-            f'<div style="flex:0 0 2.4rem;height:2.4rem;border-radius:50%;background:#1F5A96;color:white;'
+            f'<div style="flex:0 0 2.4rem;height:2.4rem;border-radius:50%;background:#004090;color:white;'
             f'font-weight:800;display:flex;align-items:center;justify-content:center">{n}</div>'
             f'<div><div style="font-weight:700;font-size:1.05rem">{titulo}</div>'
             f'<div style="color:#444;line-height:1.5">{texto}</div></div></div>', unsafe_allow_html=True)
 
 # --- fuentes y advertencias
-st.markdown("### Fuentes y advertencias")
+st.subheader("Fuentes y advertencias", icon=":material/fact_check:", anchor=False)
 col_f, col_c = st.columns([7, 5], gap="large")
 col_f.markdown("""
 | Fuente | Qué aporta | Frecuencia |
@@ -163,11 +162,13 @@ col_c.markdown("""
 """)
 
 # --- autoría
-st.divider()
-st.markdown(
-    "Hecho por **Bruno Herrera · METGEO** · [github.com/Heszo](https://github.com/Heszo) · "
-    "código abierto (MIT) en "
-    "[github.com/Heszo/monitor-meteo-concepcion](https://github.com/Heszo/monitor-meteo-concepcion)")
+st.space("medium")
+with st.container(horizontal=True, vertical_alignment="center", gap="large"):
+    st.image(str(C.LOGO_COMPLETO), width=300)
+    st.markdown(
+        "Hecho por **Bruno Herrera** · MetGeo Spa  \n"
+        ":material/code: [github.com/Heszo](https://github.com/Heszo) · código abierto (MIT) en "
+        "[github.com/Heszo/monitor-meteo-concepcion](https://github.com/Heszo/monitor-meteo-concepcion)")
 st.caption(f"Consultado el {ahora:%d/%m/%Y %H:%M} (hora de Chile) · pronóstico: "
            f"{origen_pron or 'no disponible'}. Open-Meteo gratuito limita las consultas por IP, así que los "
            "pronósticos los publica cada hora una GitHub Action y la app lee esa copia.")

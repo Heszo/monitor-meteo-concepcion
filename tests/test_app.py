@@ -47,7 +47,7 @@ def test_cada_variable_en_comparar():
         at.segmented_control(key="variable").set_value(var).run()
         assert errores(at) == [], var
     at.segmented_control(key="variable").set_value("precipitacion").run()
-    at.toggle[0].set_value(True).run()  # acumulado
+    at.toggle(key="acumulado").set_value(True).run()
     assert errores(at) == []
 
 

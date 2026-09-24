@@ -9,6 +9,7 @@ servidor, así que casi nadie espera una descarga. Para que eso funcione las
 claves de caché son fijas: se pide siempre la ventana máxima y se recorta
 después.
 """
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -17,6 +18,9 @@ import streamlit as st
 
 import fuentes as F
 
+RAIZ = Path(__file__).resolve().parent
+LOGO_COMPLETO = RAIZ / "static" / "logo_completo.png"
+LOGO_SOLO = RAIZ / "static" / "logo_solo.png"
 NEGRO, ROJO, BANDA = "#111111", "#B5323C", "rgba(120,150,190,.22)"
 DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 EJE_T = dict(tickformat="%d/%m<br>%H:%M", nticks=8, tickangle=0)
@@ -181,3 +185,34 @@ def metricas_ahora(c):
         st.metric("Presión", fmt(ult.presion, 0, "hPa"), None if np.isnan(tend) else f"{tend:+.0f} hPa en 3 h",
                   delta_color="off", border=True, icon=":material/speed:")
         st.metric("Lluvia 24 h (Concepción DGA)", fmt(pp24, 1, "mm"), border=True, icon=":material/rainy:")
+
+
+# ------------------------------------------------------------------ controles
+def controles():
+    """Barra de controles (reemplaza a la barra lateral): el sitio a la vista y el resto dentro de
+    "Ajustes". Arma y devuelve el contexto de la corrida. Sitio y días quedan en la URL para
+    compartir la vista; modelos y banda se conservan al cambiar de página."""
+    with st.container(horizontal=True, vertical_alignment="bottom", gap="small"):
+        sitio_id = st.selectbox("Sitio", [s["id"] for s in F.SITIOS], format_func=lambda i: F.SITIO[i]["nombre"],
+                                key="sitio", bind="query-params", width=290,
+                                help="Los modelos se consultan en las coordenadas del sitio elegido.")
+        with st.popover("Ajustes", icon=":material/tune:"):
+            pasado = st.slider("Días hacia atrás", 1, F.DIAS_PUBLICADOS, 3, key="pasado", bind="query-params")
+            futuro = st.slider("Días de pronóstico", 1, F.DIAS_PUBLICADOS, 5, key="futuro", bind="query-params")
+            modelos = st.multiselect("Modelos", list(F.MODELOS), default=list(F.MODELOS), format_func=nombre_modelo,
+                                     key="modelos", persist_state="session")
+            con_ensamble = st.toggle("Banda del super-ensamble (p10–p90)", value=True, key="banda",
+                                     persist_state="session")
+            if st.button("Forzar actualización", icon=":material/refresh:"):
+                st.cache_data.clear()
+            st.caption("Los datos se renuevan solos cada 15 minutos.")
+        origen = st.empty()
+    c = prepara_contexto(sitio_id, pasado, futuro, modelos, con_ensamble)
+    origen.caption(f":material/schedule: Pronóstico: {c.origen_pron or 'no disponible'}")
+    if c.error_pron and c.origen_pron is None:
+        st.warning("No se pudo obtener el pronóstico (Open-Meteo no respondió y todavía no hay copia publicada). "
+                   "Se muestran solo las observaciones; vuelve a intentar en unos minutos.  \n"
+                   f"Detalle: `{c.error_pron[:160]}`", icon=":material/cloud_off:")
+    elif c.error_pron:
+        st.caption(f":material/info: Open-Meteo no respondió; se muestra la {c.origen_pron}.")
+    return c

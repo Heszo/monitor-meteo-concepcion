@@ -39,7 +39,7 @@ for s in F.SITIOS:
 Vm = F.VARIABLES[var_m]
 unidad_m = "mm" if var_m == "precipitacion" else Vm["unidad"]
 if not filas_m:
-    st.info("Ninguna estación informó esta variable en la ventana.")
+    st.info("Ninguna estación informó esta variable en la ventana.", icon=":material/sensors_off:")
 else:
     dm = pd.DataFrame(filas_m)
     escala = {"temperatura": "RdYlBu_r", "humedad": "YlGnBu", "precipitacion": "Blues",

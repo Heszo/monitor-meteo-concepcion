@@ -73,7 +73,14 @@ if not temp.empty:
     if pron["pp"] is not None:
         q = F.percentiles(ventana(pron["pp"]))
         fp.add_trace(go.Bar(x=q.index - pd.Timedelta(minutes=30), y=q.p50, width=3.6e6 * 0.85,
-                            marker_color="#6FA3D2", name="lluvia esperada (mm/h)", opacity=.9),
+                            marker_color="#6FA3D2", name="lluvia esperada (mm/h)", opacity=.45),
+                     secondary_y=True)
+    # lluvia observada encima, más angosta y opaca, para contrastarla con la esperada
+    ll_obs = observado(sitio, "precipitacion")
+    if ll_obs is not None:
+        ll_obs = ll_obs[ll_obs.index > ahora_h - pd.Timedelta(hours=24)]
+        fp.add_trace(go.Bar(x=ll_obs.index - pd.Timedelta(minutes=30), y=ll_obs.values, width=3.6e6 * 0.5,
+                            marker_color="#1F4E8C", name="lluvia observada (mm/h)", opacity=.9),
                      secondary_y=True)
     tv = ventana(temp).median(axis=1)
     fp.add_trace(go.Scatter(x=tv.index, y=tv.values, line=dict(color="#d6604d", width=3),
@@ -86,10 +93,12 @@ if not temp.empty:
     linea_ahora(fp, pd.Timestamp(ahora))
     fp.update_yaxes(title_text="°C", secondary_y=False)
     tope = float(q.p50.max()) if pron["pp"] is not None and len(q) else 1.0
+    if ll_obs is not None and len(ll_obs):
+        tope = max(tope, float(ll_obs.max()))
     fp.update_yaxes(title_text="mm/h", secondary_y=True, showgrid=False, tickmode="auto",
                     range=[0, max(tope, 1.0) * 2.2])  # la lluvia queda en la mitad de abajo
     fp.update_layout(title=f"Ayer, hoy y los próximos 3 días · {sitio['nombre']}", height=330,
-                     margin=dict(l=10, r=10, t=45, b=10), hovermode="x unified", bargap=0,
+                     margin=dict(l=10, r=10, t=45, b=10), hovermode="x unified", bargap=0, barmode="overlay",
                      legend=dict(orientation="h", y=-0.25, yanchor="top"))
     fp.update_xaxes(**EJE_T)
     st.plotly_chart(fp, config=barra(), key="adelanto")

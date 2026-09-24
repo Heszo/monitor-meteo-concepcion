@@ -4,3 +4,7 @@ primaryColor = "#1F5A96"
 
 [server]
 headless = true
+
+[runner]
+# con ttl de 15 min, lo vencido se sigue sirviendo (mientras se refresca) hasta 45 min
+cacheBackgroundRefreshTTLMultiplier = 4.0

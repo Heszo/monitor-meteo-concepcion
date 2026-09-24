@@ -60,13 +60,33 @@ basta reactivarla desde la misma pestaña.
 ## Estructura
 
 ```
-app.py                     interfaz (Streamlit + Plotly)
+app.py                     punto de entrada: st.App que mantiene la caché caliente
+streamlit_app.py           navegación (st.navigation), controles de la barra lateral y encabezado
+app_pages/                 una página por vista: presentación, comparar, lluvia, meteograma, mapa
+comun.py                   cargas con caché y utilidades compartidas por las páginas
 fuentes.py                 descarga y ordena los datos; catálogo de variables, modelos y estaciones
 actualiza_pronosticos.py   baja los pronósticos de todos los sitios (lo corre la GitHub Action)
-.github/workflows/         Action horaria que publica los pronósticos en la rama "datos"
-.streamlit/                tema de la app
+tests/                     pruebas de humo con st.testing.AppTest
+.github/workflows/         Actions: pronósticos cada hora y pruebas en cada push
+.streamlit/                tema y configuración de la caché
 requirements.txt           dependencias
 ```
+
+## Velocidad
+
+- Las cargas usan caché con `ttl` de 15 minutos y `refresh_mode="background"`: cuando una entrada
+  vence, el visitante recibe al instante la versión anterior y la nueva se baja por detrás.
+- `app.py` envuelve la app en `st.App` y, desde el servidor, toca esas cargas al arrancar y cada 5
+  minutos, así que la caché está caliente aunque nadie haya entrado en horas.
+- Las claves de caché no dependen de los controles: siempre se pide la ventana máxima (7 días) y se
+  recorta en la página.
+- Solo se ejecuta la página abierta.
+
+## Enlaces compartibles
+
+El sitio, los días, la variable y la estación elegida quedan en la URL, así que se puede compartir una
+vista exacta; por ejemplo
+`/comparar?sitio=Lota&variable=Presión+al+nivel+del+mar&pasado=5`.
 
 Para agregar o quitar estaciones, o cambiar qué variables mide cada una, editar `SITIOS` en
 `fuentes.py`. El catálogo completo de VIPNet sale de
@@ -79,6 +99,8 @@ Para agregar o quitar estaciones, o cambiar qué variables mide cada una, editar
 python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
+
+Pruebas: `cd tests && python -m pytest -q`.
 
 Para usar una copia local de los pronósticos (por ejemplo, recién generada con
 `python actualiza_pronosticos.py salida`), definir `MONITOR_DATOS=salida` antes de lanzar la app.

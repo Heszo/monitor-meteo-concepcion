@@ -163,25 +163,16 @@ def nombre_modelo(m):
 
 
 def metricas_ahora(c):
-    """Última observación del sitio elegido. Lo que el sitio no mide se toma de una estación de
-    respaldo (viento, ráfaga y presión: Carriel Sur, la única que los mide; lluvia: Concepción) y la
-    tarjeta lo dice."""
-    sitio, metar = c.sitio, c.metar
-    cs, cc = F.SITIO["carrielsur"], F.SITIO["concepcion"]
+    """Última observación del sitio elegido; lo que el sitio no mide queda en «—»."""
+    sitio = c.sitio
 
-    def ultimo(s, variable):
-        """(valor, hora, sitio de origen) de la última medición; si s no la mide, de la estación de
-        respaldo. (nan, None, None) si no hay dato."""
-        if variable not in s["vars"]:
-            s = cc if variable == "precipitacion" else cs
-        o = c.observado(s, variable)
+    def ultimo(variable):
+        """(valor, hora) de la última medición del sitio; (nan, None) si no la mide o no hay dato."""
+        o = c.observado(sitio, variable)
         o = None if o is None else o.dropna()
         if o is None or o.empty:
-            return np.nan, None, s
-        return float(o.iloc[-1]), o.index[-1], s
-
-    def titulo(nombre, s):
-        return nombre if s is sitio else f"{nombre} · {F.etiqueta(s)}"
+            return np.nan, None
+        return float(o.iloc[-1]), o.index[-1]
 
     horas = []
     tarjetas = []
@@ -192,33 +183,33 @@ def metricas_ahora(c):
         ("rafaga", "Ráfaga", 0, "km/h", "storm"),
         ("presion", "Presión", 0, "hPa", "speed"),
     ]:
-        v, h, s = ultimo(sitio, var)
-        if s is sitio and h is not None:
+        v, h = ultimo(var)
+        if h is not None:
             horas.append(h)
         delta = None
-        if var == "viento":
-            delta = F.cardinal(ultimo(sitio, "direccion")[0])
+        if var == "viento" and h is not None:
+            delta = F.cardinal(ultimo("direccion")[0])
         elif var == "presion" and h is not None:
-            p = c.observado(s, "presion").dropna()
+            p = c.observado(sitio, "presion").dropna()
             hace3 = p[p.index <= h - pd.Timedelta(hours=3)]
             delta = f"{v - hace3.iloc[-1]:+.0f} hPa en 3 h" if len(hace3) else None
-        valor = "sin ráfagas" if var == "rafaga" and np.isnan(v) and not metar.empty else fmt(v, dec, unidad)
-        tarjetas.append((titulo(nombre, s), valor, delta, icono))
+        # el METAR informa ráfaga solo cuando es significativa: sin dato con METAR vigente = sin ráfagas
+        sin_rafagas = var == "rafaga" and var in sitio["vars"] and np.isnan(v) and not c.metar.empty
+        tarjetas.append((nombre, "sin ráfagas" if sin_rafagas else fmt(v, dec, unidad), delta, icono))
 
-    s_ll = sitio if "precipitacion" in sitio["vars"] else cc
-    pp = c.observado(s_ll, "precipitacion")
-    pp24 = np.nan if pp is None or pp.empty else pp[pp.index > pp.index.max() - pd.Timedelta(hours=24)].sum()
-    if s_ll is sitio and pp is not None and not pp.empty:
+    pp = c.observado(sitio, "precipitacion")
+    pp24 = np.nan
+    if pp is not None and not pp.empty:
+        pp24 = pp[pp.index > pp.index.max() - pd.Timedelta(hours=24)].sum()
         horas.append(pp.index.max())
-    tarjetas.append((titulo("Lluvia 24 h", s_ll), fmt(pp24, 1, "mm"), None, "rainy"))
+    tarjetas.append(("Lluvia 24 h", fmt(pp24, 1, "mm"), None, "rainy"))
 
     if horas:
         h = max(horas)
         st.caption(f"Ahora en {F.etiqueta(sitio)} · última medición a las {h:%H:%M} del {h:%d/%m} "
-                   "(hora de Chile). Las tarjetas que nombran otra estación son variables que este sitio no mide.")
+                   "(hora de Chile). «—»: sin medición de esa variable en esta estación.")
     else:
-        st.caption(f"Sin mediciones recientes de {F.etiqueta(sitio)}; se muestran las de las estaciones "
-                   "de respaldo.")
+        st.caption(f"Sin mediciones recientes de {F.etiqueta(sitio)}.")
     # fila horizontal: se reparte en varias líneas sola en pantallas angostas
     with st.container(horizontal=True, gap="small"):
         for nombre, valor, delta, icono in tarjetas:

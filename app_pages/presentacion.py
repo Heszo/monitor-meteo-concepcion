@@ -172,8 +172,7 @@ with st.container(horizontal=True, vertical_alignment="center", gap="large"):
         st.link_button("Instagram @metgeo.spa", C.INSTAGRAM, icon=":material/photo_camera:")
         st.link_button("LinkedIn MetGeo Spa", C.LINKEDIN, icon=":material/work:")
 st.caption(f"Consultado el {ahora:%d/%m/%Y %H:%M} (hora de Chile) · pronóstico: "
-           f"{origen_pron or 'no disponible'}. Open-Meteo gratuito limita las consultas por IP, así que los "
-           "pronósticos los publica cada hora una GitHub Action y la app lee esa copia.")
+           f"{origen_pron or 'no disponible'}.")
 for v in ("precipitacion", "temperatura", "humedad"):
     avisos.extend(C.vipnet_seguro(v)[1])
 if metar.empty:

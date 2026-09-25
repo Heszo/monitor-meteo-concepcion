@@ -72,7 +72,7 @@ else:
 
 with col_graf:
     if P is None or P.empty:
-        st.warning("El super-ensamble no respondió; prueba «Forzar actualización».")
+        st.warning("El super-ensamble no respondió; los datos se renuevan solos cada hora.")
     else:
         q = F.percentiles(P)
         fa = go.Figure()

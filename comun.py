@@ -233,9 +233,7 @@ def controles():
                                      key="modelos", persist_state="session")
             con_ensamble = st.toggle("Banda del super-ensamble (p10–p90)", value=True, key="banda",
                                      persist_state="session")
-            if st.button("Forzar actualización", icon=":material/refresh:"):
-                st.cache_data.clear()
-            st.caption("Los datos se renuevan solos cada 15 minutos.")
+            st.caption("Los datos se renuevan solos cada hora.")
         origen = st.empty()
     c = prepara_contexto(sitio_id, pasado, futuro, modelos, con_ensamble)
     origen.caption(f":material/schedule: Pronóstico: {c.origen_pron or 'no disponible'}")

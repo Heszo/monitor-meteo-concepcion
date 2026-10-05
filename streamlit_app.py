@@ -17,6 +17,7 @@ st.set_page_config(page_title="MetGeo Concepción · monitor meteorológico", pa
                    layout="wide")
 C.logo()
 C.vigila_tema()
+st.html(C.CSS_MAPAS)  # esquinas redondeadas y filete de los mapas satelitales
 
 INICIO = st.Page("app_pages/presentacion.py", title="Home", icon=":material/home:", default=True)
 pagina = st.navigation([

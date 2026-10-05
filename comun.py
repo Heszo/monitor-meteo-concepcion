@@ -44,13 +44,13 @@ REPO = "https://github.com/Heszo/monitor-meteo-concepcion"
 CLARO = SimpleNamespace(
     oscuro=False, logo=RAIZ / "static" / "logo_completo.svg", icono=RAIZ / "static" / "logo_solo.svg",
     tinta=NEGRO, azul="#1F5A96", ens="#56708f", lluvia_esp="#6FA3D2", lluvia_obs="#1F4E8C", rafaga="#5B4B8A",
-    niveles=("#9DBFDD", "#6FA3D2", "#1F4E8C"), grupos=F.GRUPOS, fondo_leyenda="rgba(255,255,255,.85)",
+    niveles=("#9DBFDD", "#6FA3D2", "#1F4E8C"), grupos=F.GRUPOS,
     plantilla="plotly_white", fondo="#FFFFFF")
 OSCURO = SimpleNamespace(
     oscuro=True, logo=RAIZ / "static" / "logo_completo_claro.svg", icono=RAIZ / "static" / "logo_solo_claro.svg",
     tinta="#F2F2F2", azul="#6FA8DC", ens="#9DB3CC", lluvia_esp="#4E94C3", lluvia_obs="#BFE0F7", rafaga="#B9A6E8",
     niveles=("#5A7FA3", "#6FA8DC", "#A8D4F5"), grupos={"costa": "#3CC6C9", "ciudad": "#F28C3E", "interior": "#B08AE0"},
-    fondo_leyenda="rgba(14,17,23,.8)", plantilla="plotly_dark", fondo="#0E1117")
+    plantilla="plotly_dark", fondo="#0E1117")
 
 
 def paleta():
@@ -223,6 +223,39 @@ def fmt(v, dec, unidad=""):
     return f"{v:.{dec}f}{(' ' + unidad) if unidad else ''}"
 
 
+# ------------------------------------------------------------------ mapas satelitales
+MARCO_MAPA = "rgba(128,128,128,.45)"  # gris semitransparente: se ve igual de discreto sobre fondo claro u oscuro
+# El mapa de MapLibre es un div aparte dentro del gráfico: se le redondean las esquinas y se le pone un filete
+# fino, así la imagen satelital no termina en un corte seco contra el fondo de la página.
+CSS_MAPAS = f"""<style>
+.stPlotlyChart .maplibregl-map {{ border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px {MARCO_MAPA}; }}
+</style>"""
+
+
+def encuadre(lats, lons, ancho, alto, borde=36, der=0):
+    """Centro y zoom que dejan todos los puntos dentro de un mapa de ancho × alto px, con 'borde' px libres
+    por lado y 'der' px más de ancho para las etiquetas a la derecha de cada punto. Los puntos quedan
+    centrados: si el mapa sale más angosto, se recortan primero las etiquetas del este y no las estaciones
+    de la costa. Proyección de Mercator con mosaicos de 512 px, que es lo que usa MapLibre."""
+    y = np.log(np.tan(np.pi / 4 + np.radians(np.asarray(lats, float)) / 2))  # latitud en Mercator (rad)
+    x = np.radians(np.asarray(lons, float))
+    zx = np.log2((ancho - 2 * borde - der) / 512 * 2 * np.pi / max(x.max() - x.min(), 1e-4))
+    zy = np.log2((alto - 2 * borde) / 512 * 2 * np.pi / max(y.max() - y.min(), 1e-4))
+    zoom = float(min(zx, zy))
+    lon_c = (x.max() + x.min()) / 2
+    lat_c = 2 * np.arctan(np.exp((y.max() + y.min()) / 2)) - np.pi / 2
+    return dict(center=dict(lat=float(np.degrees(lat_c)), lon=float(np.degrees(lon_c))), zoom=round(zoom, 2))
+
+
+def mapa_satelital(fig, sitios, ancho, alto, der=0):
+    """Fondo Esri World Imagery y encuadre que muestra todas las estaciones. 'ancho' es el ancho más angosto con
+    que se espera ver el gráfico: si el mapa sale más ancho, manda el alto y solo se ve más terreno a los lados."""
+    fig.update_layout(map=dict(style="white-bg", **encuadre([s["lat"] for s in sitios], [s["lon"] for s in sitios],
+                                                            ancho, alto, der=der),
+                               layers=[dict(sourcetype="raster", source=[F.ESRI], below="traces")]),
+                      height=alto)
+
+
 def _data_uri(ruta):
     return "data:image/svg+xml;base64," + base64.b64encode(ruta.read_bytes()).decode()
 
@@ -261,6 +294,9 @@ def exporta(fig, formato, oscuro):
     f.update_layout(template=p.plantilla, paper_bgcolor=p.fondo, plot_bgcolor=p.fondo, height=alto,
                     margin=dict(l=max(m.l or 0, 30), r=max(m.r or 0, 30), t=(m.t or 0) + LOGO_ALTO + 10,
                                 b=max(m.b or 0, 30)))
+    if any(t.type == "scattermap" for t in f.data):  # el filete de CSS_MAPAS no llega a kaleido: se dibuja aquí
+        f.add_shape(type="rect", xref="paper", yref="paper", x0=0, x1=1, y0=0, y1=1, layer="above",
+                    line=dict(color=MARCO_MAPA, width=1))
     with _kaleido:
         if not _kaleido_listo:
             import kaleido

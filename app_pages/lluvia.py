@@ -55,9 +55,8 @@ with col_mapa:
         text=[f"{s['nombre'].split(' (')[0]} {v:.0f}" for s, v in zip(activas, mm)],
         textposition="middle right", textfont=dict(color="white", size=11),
         hovertemplate="%{text} mm<extra></extra>"))
-    fmap.update_layout(map=dict(style="white-bg", center=dict(lat=-36.86, lon=-72.95), zoom=8.6,
-                                layers=[dict(sourcetype="raster", source=[F.ESRI], below="traces")]),
-                       margin=dict(l=0, r=0, t=0, b=0), height=470, showlegend=False)
+    C.mapa_satelital(fmap, F.SITIOS, ancho=430, alto=470, der=110)  # 'der': etiquetas a la derecha de cada punto
+    fmap.update_layout(margin=dict(l=0, r=0, t=0, b=0), showlegend=False)
     C.grafico(fmap, "mapa_lluvia", config=barra("resetViewMap"), key="mapa_lluvia")
     st.caption("Colores: < 25 · 25–50 · 50–75 · 75–100 · 100–150 · > 150 mm. Imagen: Esri World Imagery.")
     opciones = {"Grupos": None} | {s["nombre"].split(" (")[0]: s["id"] for s in activas}

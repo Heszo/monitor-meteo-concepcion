@@ -124,10 +124,10 @@ with col_red:
         fred.add_trace(go.Scattermap(lat=[x["lat"] for x in ss], lon=[x["lon"] for x in ss], mode="markers",
                                      marker=dict(size=13, color=color), name=g,
                                      text=[x["nombre"] for x in ss], hovertemplate="%{text}<extra></extra>"))
-    fred.update_layout(map=dict(style="white-bg", center=dict(lat=-36.86, lon=-72.95), zoom=8.3,
-                                layers=[dict(sourcetype="raster", source=[F.ESRI], below="traces")]),
-                       margin=dict(l=0, r=0, t=0, b=0), height=380,
-                       legend=dict(orientation="h", y=0.02, x=0.02, bgcolor=PAL.fondo_leyenda))
+    # la leyenda va bajo el mapa, en su propio margen, para no tapar las estaciones del borde
+    C.mapa_satelital(fred, F.SITIOS, ancho=360, alto=380)
+    fred.update_layout(height=416, margin=dict(l=0, r=0, t=0, b=36),
+                       legend=dict(orientation="h", x=0.5, xanchor="center", y=-0.015, yanchor="top"))
     C.grafico(fred, "red_de_estaciones", config=barra("resetViewMap"), key="mapa_red")
     st.caption("La red: 16 estaciones VIPNet y el aeropuerto Carriel Sur, agrupadas en costa, ciudad e "
                "interior. Imagen: Esri World Imagery.")

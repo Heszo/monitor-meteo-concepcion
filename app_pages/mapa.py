@@ -51,9 +51,8 @@ else:
         text=[f"{e} {fmt(v, Vm['decimales'])}" for e, v in zip(dm["Estación"], dm.valor)],
         textposition="middle right", textfont=dict(color="white", size=12),
         hovertemplate="%{text} " + unidad_m + "<extra></extra>"))
-    fmap.update_layout(map=dict(style="white-bg", center=dict(lat=-36.86, lon=-72.95), zoom=8.7,
-                                layers=[dict(sourcetype="raster", source=[F.ESRI], below="traces")]),
-                       margin=dict(l=0, r=0, t=0, b=0), height=560)
+    C.mapa_satelital(fmap, F.SITIOS, ancho=520, alto=560, der=150)  # 'der': etiquetas a la derecha de cada punto
+    fmap.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     col_map, col_tab = st.columns([3, 2])
     with col_map:
         C.grafico(fmap, f"mapa_{var_m}", config=barra("resetViewMap"))

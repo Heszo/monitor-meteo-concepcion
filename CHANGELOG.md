@@ -12,6 +12,19 @@ Cómo publicar una versión: ver «Versiones» en el [README](README.md#versione
 
 ## [Sin publicar]
 
+## [1.1.1] - 2026-10-05
+
+### Corregido
+- El mapa de la red en el Home cortaba las estaciones del extremo norte (Dichato) y sur (Santa Juana), y su
+  leyenda (costa, ciudad, interior) tapaba las estaciones del borde inferior. Ahora el encuadre se calcula a
+  partir de las coordenadas de las estaciones y la leyenda va debajo del mapa.
+- Los mapas de Lluvia y de Mapa de estaciones usan el mismo encuadre calculado, así entran todas las
+  estaciones con sus etiquetas, en vez de un centro y un zoom fijos.
+
+### Cambiado
+- Los mapas satelitales tienen esquinas redondeadas y un filete gris fino, igual en modo claro y oscuro; las
+  descargas PNG/PDF de los mapas llevan ese mismo filete.
+
 ## [1.1.0] - 2026-10-05
 
 ### Agregado
@@ -34,6 +47,7 @@ Primera versión publicada.
 - Verificación de modelos contra lo observado (sesgo, MAE, RMSE, correlación).
 - Enlaces compartibles: sitio, días y variable quedan en la URL.
 
-[Sin publicar]: https://github.com/Heszo/monitor-meteo-concepcion/compare/v1.1.0...HEAD
+[Sin publicar]: https://github.com/Heszo/monitor-meteo-concepcion/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/Heszo/monitor-meteo-concepcion/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Heszo/monitor-meteo-concepcion/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Heszo/monitor-meteo-concepcion/releases/tag/v1.0.0

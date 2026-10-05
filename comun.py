@@ -9,18 +9,22 @@ servidor, así que casi nadie espera una descarga. Para que eso funcione las
 claves de caché son fijas: se pide siempre la ventana máxima y se recorta
 después.
 """
+import base64
+import re
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 import fuentes as F
 
 RAIZ = Path(__file__).resolve().parent
-LOGO_COMPLETO = RAIZ / "static" / "logo_completo.png"
-LOGO_SOLO = RAIZ / "static" / "logo_solo.png"
+VERSION = (RAIZ / "VERSION").read_text().strip()
+LOGO_SOLO = RAIZ / "static" / "logo_solo.png"  # ícono de la pestaña (page_icon no acepta SVG)
 NEGRO, ROJO, BANDA = "#111111", "#B5323C", "rgba(120,150,190,.22)"
 DIAS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 EJE_T = dict(tickformat="%d/%m<br>%H:%M", nticks=8, tickangle=0)
@@ -30,6 +34,28 @@ VACIO = {"det": {}, "pct": {}, "pp": None, "raf6h": None}
 VIEJO = pd.Timedelta(hours=3)
 INSTAGRAM = "https://www.instagram.com/metgeo.spa/"
 LINKEDIN = "https://www.linkedin.com/company/metgeo-spa/"
+REPO = "https://github.com/Heszo/monitor-meteo-concepcion"
+
+
+# ------------------------------------------------------------------ modo claro / oscuro
+# config.toml define [theme.light] y [theme.dark] sin fijar `base`, así que Streamlit sigue el modo del
+# navegador. Lo que se dibuja desde Python (logos, colores de los gráficos, tarjetas HTML) lo elige aquí.
+# Los logos "claro" son los de trazo claro, para fondo oscuro.
+CLARO = SimpleNamespace(
+    oscuro=False, logo=RAIZ / "static" / "logo_completo.svg", icono=RAIZ / "static" / "logo_solo.svg",
+    tinta=NEGRO, azul="#1F5A96", ens="#56708f", lluvia_esp="#6FA3D2", lluvia_obs="#1F4E8C", rafaga="#5B4B8A",
+    niveles=("#9DBFDD", "#6FA3D2", "#1F4E8C"), grupos=F.GRUPOS, fondo_leyenda="rgba(255,255,255,.85)",
+    plantilla="plotly_white", fondo="#FFFFFF")
+OSCURO = SimpleNamespace(
+    oscuro=True, logo=RAIZ / "static" / "logo_completo_claro.svg", icono=RAIZ / "static" / "logo_solo_claro.svg",
+    tinta="#F2F2F2", azul="#6FA8DC", ens="#9DB3CC", lluvia_esp="#4E94C3", lluvia_obs="#BFE0F7", rafaga="#B9A6E8",
+    niveles=("#5A7FA3", "#6FA8DC", "#A8D4F5"), grupos={"costa": "#3CC6C9", "ciudad": "#F28C3E", "interior": "#B08AE0"},
+    fondo_leyenda="rgba(14,17,23,.8)", plantilla="plotly_dark", fondo="#0E1117")
+
+
+def paleta():
+    """Colores y logos del modo en que el navegador muestra la app (claro si no se sabe)."""
+    return OSCURO if st.context.theme.type == "dark" else CLARO
 
 
 # ------------------------------------------------------------------ cargas con caché
@@ -155,6 +181,76 @@ def fmt(v, dec, unidad=""):
     if v is None or (isinstance(v, float) and np.isnan(v)):
         return "—"
     return f"{v:.{dec}f}{(' ' + unidad) if unidad else ''}"
+
+
+def _data_uri(ruta):
+    return "data:image/svg+xml;base64," + base64.b64encode(ruta.read_bytes()).decode()
+
+
+_LOGO_URI = {False: _data_uri(CLARO.logo), True: _data_uri(OSCURO.logo)}
+_kaleido = threading.Lock()
+_kaleido_listo = False
+ANCHO_EXPORTA = 1400
+LOGO_ALTO = 46  # px; el logo completo mide 780 × 199,5 (proporción 3,91)
+
+
+def _area_dibujo(f, ancho, alto):
+    """(ancho, alto) en px del área de dibujo ("paper"), que los márgenes automáticos (leyendas, títulos de
+    ejes) agrandan sin avisar: se mide en un SVG de prueba, uniendo el recorte de cada subgráfico (los
+    recortes de un solo eje ocupan todo el ancho o todo el alto y se descartan)."""
+    svg = f.to_image(format="svg", width=ancho, height=alto).decode()
+    cajas = [(x, y, w, h) for x, y, w, h in (map(float, c) for c in re.findall(
+        r'class="axesclip"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"', svg))
+        if w < ancho and h < alto]
+    if not cajas:  # mapas: sin fondo cartesiano, el área es lo que dejan los márgenes
+        m = f.layout.margin
+        return ancho - (m.l or 0) - (m.r or 0), alto - (m.t or 0) - (m.b or 0)
+    return (max(x + w for x, _, w, _ in cajas) - min(x for x, _, _, _ in cajas),
+            max(y + h for _, y, _, h in cajas) - min(y for _, y, _, _ in cajas))
+
+
+def exporta(fig, formato, oscuro):
+    """PNG (al doble de resolución) o PDF vectorial de la figura, con el fondo del modo en que se veía y
+    el logo de MetGeo arriba a la derecha. Lo dibuja kaleido con un Chrome que queda abierto (la primera
+    exportación tarda unos segundos; las siguientes, décimas)."""
+    global _kaleido_listo
+    p = OSCURO if oscuro else CLARO
+    f = go.Figure(fig)
+    alto = (fig.layout.height or 450) + LOGO_ALTO + 10
+    m = fig.layout.margin
+    f.update_layout(template=p.plantilla, paper_bgcolor=p.fondo, plot_bgcolor=p.fondo, height=alto,
+                    margin=dict(l=max(m.l or 0, 30), r=max(m.r or 0, 30), t=(m.t or 0) + LOGO_ALTO + 10,
+                                b=max(m.b or 0, 30)))
+    with _kaleido:
+        if not _kaleido_listo:
+            import kaleido
+            kaleido.start_sync_server(silence_warnings=True)
+            _kaleido_listo = True
+        ancho_px, alto_px = _area_dibujo(f, ANCHO_EXPORTA, alto)
+        # logo justo encima de la esquina superior derecha del área de dibujo, en el margen que se agregó
+        f.add_layout_image(source=_LOGO_URI[oscuro], xref="paper", yref="paper", x=1, y=1 + 4 / alto_px,
+                           xanchor="right", yanchor="bottom", sizex=LOGO_ALTO * 3.91 / ancho_px,
+                           sizey=LOGO_ALTO / alto_px, sizing="contain", layer="above")
+        return f.to_image(format=formato, width=ANCHO_EXPORTA, height=alto, scale=2 if formato == "png" else 1)
+
+
+def grafico(fig, nombre, config=None, key=None):
+    """st.plotly_chart más los botones para descargar la figura en PNG o PDF. 'nombre' va en el archivo."""
+    st.plotly_chart(fig, config=config or barra(), key=key)
+    oscuro = paleta().oscuro
+    archivo = f"metgeo_{nombre}_{F.ahora_local():%Y%m%d_%H%M}"
+    with st.container(horizontal=True, horizontal_alignment="right", gap="small"):
+        for formato, mime, ayuda in [("png", "image/png", "Imagen PNG en alta resolución"),
+                                     ("pdf", "application/pdf", "PDF vectorial, editable")]:
+            st.download_button(formato.upper(), data=lambda formato=formato: exporta(fig, formato, oscuro),
+                               file_name=f"{archivo}.{formato}", mime=mime, on_click="ignore", type="tertiary",
+                               icon=":material/download:", help=ayuda, key=f"dl_{key or nombre}_{formato}")
+
+
+def logo():
+    """Logo de la barra superior según el modo claro u oscuro."""
+    p = paleta()
+    st.logo(str(p.logo), icon_image=str(p.icono), size="large")
 
 
 def nombre_modelo(m):

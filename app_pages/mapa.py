@@ -55,7 +55,8 @@ else:
                                 layers=[dict(sourcetype="raster", source=[F.ESRI], below="traces")]),
                        margin=dict(l=0, r=0, t=0, b=0), height=560)
     col_map, col_tab = st.columns([3, 2])
-    col_map.plotly_chart(fmap, config=barra("resetViewMap"))
+    with col_map:
+        C.grafico(fmap, f"mapa_{var_m}", config=barra("resetViewMap"))
     col_tab.dataframe(dm[["Estación", "Grupo", "valor", "Hora", "Fuente"]]
                       .rename(columns={"valor": f"{Vm['nombre']} ({unidad_m})"}).sort_values("Grupo"),
                       hide_index=True, width="stretch",

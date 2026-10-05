@@ -1,6 +1,9 @@
-[theme]
-base = "light"
+# Sin `base`: la app sigue el modo claro u oscuro del navegador (desde el menú ⋮ → Settings se puede fijar).
+[theme.light]
 primaryColor = "#004090"     # azul del logo MetGeo
+
+[theme.dark]
+primaryColor = "#4E94C3"     # celeste del logo claro: el azul del logo no se lee sobre fondo oscuro
 
 [server]
 headless = true

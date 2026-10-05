@@ -7,8 +7,9 @@ from plotly.subplots import make_subplots
 
 import comun as C
 import fuentes as F
-from comun import BANDA, DIAS, EJE_T, NEGRO, ROJO, barra, fmt, linea_ahora, nombre_modelo
+from comun import BANDA, DIAS, EJE_T, ROJO, barra, fmt, linea_ahora, nombre_modelo
 
+PAL = C.paleta()
 c = C.contexto()
 sitio, pasado, futuro, modelos, con_ensamble = c.sitio, c.pasado, c.futuro, c.modelos, c.con_ensamble
 ahora, t0, t_fin, metar, pron, det, pct, avisos = c.ahora, c.t0, c.t_fin, c.metar, c.pron, c.det, c.pct, c.avisos
@@ -51,19 +52,19 @@ if banda is not None:
         fig.add_trace(go.Scatter(x=np.r_[x, x[::-1]], y=np.r_[banda.p90, banda.p10[::-1]], fill="toself",
                                  fillcolor=BANDA, line=dict(width=0), name="super-ensamble p10–p90",
                                  hoverinfo="skip"))
-    fig.add_trace(go.Scatter(x=x, y=banda.p50, line=dict(color="#56708f", width=1.5, dash="dash", shape=forma),
+    fig.add_trace(go.Scatter(x=x, y=banda.p50, line=dict(color=PAL.ens, width=1.5, dash="dash", shape=forma),
                              name="super-ensamble mediana"))
 if histograma and obs is not None and len(obs):
     fig.add_trace(go.Bar(x=obs.index - pd.Timedelta(minutes=30), y=obs.values, width=3.6e6 * 0.85,
-                         marker_color=NEGRO, opacity=0.8, name=f"observado · {sitio['nombre']}"))
+                         marker_color=PAL.tinta, opacity=0.8, name=f"observado · {sitio['nombre']}"))
 modo = "markers" if var == "direccion" else "lines"
 for m in mod_df.columns:
     fig.add_trace(go.Scatter(x=mod_df.index, y=mod_df[m], mode=modo, name=nombre_modelo(m),
                              line=dict(color=F.MODELOS[m][2], width=1.6, shape=forma), marker=dict(size=4)))
 if not histograma and obs is not None and len(obs):
     fig.add_trace(go.Scatter(x=obs.index, y=obs.values, mode="lines+markers" if var != "direccion" else "markers",
-                             name=f"observado · {sitio['nombre']}", line=dict(color=NEGRO, width=2.6),
-                             marker=dict(size=5, color=NEGRO)))
+                             name=f"observado · {sitio['nombre']}", line=dict(color=PAL.tinta, width=2.6),
+                             marker=dict(size=5, color=PAL.tinta)))
 linea_ahora(fig, pd.Timestamp(ahora))
 fig.update_layout(title=f"{V['nombre']}{' acumulada' if acumular else ''} ({unidad}) · {sitio['nombre']}",
                   height=460, hovermode="x unified", margin=dict(l=10, r=10, t=50, b=10),
@@ -71,7 +72,7 @@ fig.update_layout(title=f"{V['nombre']}{' acumulada' if acumular else ''} ({unid
 if var == "direccion":
     fig.update_yaxes(range=[0, 360], tickvals=[0, 90, 180, 270, 360], ticktext=["N", "E", "S", "O", "N"])
 fig.update_xaxes(**EJE_T)
-st.plotly_chart(fig, config=barra())
+C.grafico(fig, f"comparar_{var}_{sitio['id']}")
 if obs is None:
     disponibles = [F.SITIO[s["id"]]["nombre"] for s in F.SITIOS if var in s["vars"]]
     st.info(icon=":material/sensors_off:", body=f"{sitio['nombre']} no mide {V['nombre'].lower()}. "
@@ -105,11 +106,12 @@ if obs is not None and len(obs) and not acumular:
             {"Correlación": st.column_config.NumberColumn(format="%.2f")})
         fb = go.Figure(go.Bar(
             x=tabla.mae, y=tabla.Modelo, orientation="h",
-            marker_color=[F.MODELOS[m][2] if m in F.MODELOS else "#56708f" for m in tabla.modelo],
+            marker_color=[F.MODELOS[m][2] if m in F.MODELOS else PAL.ens for m in tabla.modelo],
             text=[f"{v:.{dec}f}" for v in tabla.mae], textposition="outside"))
         fb.update_layout(title=f"Error absoluto medio ({V['unidad']}) · menor es mejor", height=300,
                          margin=dict(l=10, r=30, t=40, b=10), yaxis=dict(autorange="reversed"))
-        col_g.plotly_chart(fb, config=barra())
+        with col_g:
+            C.grafico(fb, f"error_{var}_{sitio['id']}")
         st.caption("Sesgo > 0: el modelo sobrestima. Los días pasados de Open-Meteo son pronósticos de "
                    "corto plazo de las corridas recientes, no reanálisis. El modelo se compara en el punto "
                    "de grilla más cercano a la estación, así que parte del error es de representatividad.")

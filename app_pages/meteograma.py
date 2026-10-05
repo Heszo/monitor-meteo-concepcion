@@ -7,8 +7,9 @@ from plotly.subplots import make_subplots
 
 import comun as C
 import fuentes as F
-from comun import BANDA, DIAS, EJE_T, NEGRO, ROJO, barra, fmt, linea_ahora, nombre_modelo
+from comun import BANDA, DIAS, EJE_T, ROJO, barra, fmt, linea_ahora, nombre_modelo
 
+PAL = C.paleta()
 c = C.contexto()
 sitio, pasado, futuro, modelos, con_ensamble = c.sitio, c.pasado, c.futuro, c.modelos, c.con_ensamble
 ahora, t0, t_fin, metar, pron, det, pct, avisos = c.ahora, c.t0, c.t_fin, c.metar, c.pron, c.det, c.pct, c.avisos
@@ -24,8 +25,8 @@ titulos = {"temperatura": "Temperatura (°C)", "humedad": "Humedad relativa (%)"
            "presion": "Presión al nivel del mar (hPa)", "precipitacion": "Precipitación (mm/h)"}
 fm = make_subplots(rows=len(filas), cols=1, shared_xaxes=True, vertical_spacing=0.045,
                    subplot_titles=[titulos[f] for f in filas])
-fm.update_annotations(x=0, xanchor="left", font=dict(size=13, color="#333"))
-color_mod = "#1F5A96" if fuente_mod == "mediana" else F.MODELOS[fuente_mod][2]
+fm.update_annotations(x=0, xanchor="left", font=dict(size=13))
+color_mod = PAL.azul if fuente_mod == "mediana" else F.MODELOS[fuente_mod][2]
 etiqueta_mod = "mediana de modelos" if fuente_mod == "mediana" else F.MODELOS[fuente_mod][0]
 
 def serie_mod(v):
@@ -69,13 +70,13 @@ for fila, v in enumerate(filas, start=1):
     o = recorta(observado(sitio, v))
     if o is not None and len(o):
         fm.add_trace(go.Scatter(x=o.index, y=o.values, mode="markers" if v == "direccion" else "lines",
-                                line=dict(color=NEGRO, width=2.2), marker=dict(size=4, color=NEGRO),
+                                line=dict(color=PAL.tinta, width=2.2), marker=dict(size=4, color=PAL.tinta),
                                 name=f"observado · {sitio['nombre']}", legendgroup="obs",
                                 showlegend=leyenda("obs")), row=fila, col=1)
     if v == "viento":
         o = recorta(observado(sitio, "rafaga"))
         if o is not None and len(o):
-            fm.add_trace(go.Scatter(x=o.index, y=o.values, mode="markers", marker=dict(color=NEGRO, size=7,
+            fm.add_trace(go.Scatter(x=o.index, y=o.values, mode="markers", marker=dict(color=PAL.tinta, size=7,
                                     symbol="triangle-up"), name="ráfaga observada", legendgroup="rafo",
                                     showlegend=leyenda("rafo")), row=fila, col=1)
     linea_ahora(fm, pd.Timestamp(ahora), xref=f"x{fila if fila > 1 else ''}",
@@ -87,7 +88,7 @@ fm.update_layout(height=1300, hovermode="x unified", margin=dict(l=10, r=10, t=7
 fm.update_layout(legend_y=1.035)
 fm.update_xaxes(**EJE_T, showgrid=True)
 fm.update_xaxes(showticklabels=True, row=len(filas), col=1)
-st.plotly_chart(fm, config=barra())
+C.grafico(fm, f"meteograma_{sitio['id']}")
 faltan = [F.VARIABLES[v]["nombre"].lower() for v in filas if v not in sitio["vars"]]
 if faltan:
     st.caption(f"{sitio['nombre']} no mide: {', '.join(faltan)} (solo pronóstico en esos paneles).")

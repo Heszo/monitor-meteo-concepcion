@@ -9,6 +9,7 @@ import comun as C
 import fuentes as F
 from comun import BANDA, DIAS, EJE_T, NEGRO, ROJO, barra, fmt, linea_ahora, nombre_modelo
 
+PAL = C.paleta()
 c = C.contexto()
 sitio, pasado, futuro, modelos, con_ensamble = c.sitio, c.pasado, c.futuro, c.modelos, c.con_ensamble
 ahora, t0, t_fin, metar, pron, det, pct, avisos = c.ahora, c.t0, c.t_fin, c.metar, c.pron, c.det, c.pct, c.avisos
@@ -17,8 +18,8 @@ observado, recorta, det_var = c.observado, c.recorta, c.det_var
 
 ESCALA_LLUVIA = [(25, "#FFF3B0"), (50, "#B8E186"), (75, "#41B6C4"), (100, "#2C7FB8"), (150, "#8856A7"),
                  (np.inf, "#E7298A")]
-NIVELES_6H = [(10, "débil", "#9DBFDD"), (25, "moderada", "#6FA3D2"), (np.inf, "fuerte", "#1F4E8C")]
-AZUL = "#1F5A96"
+NIVELES_6H = list(zip((10, 25, np.inf), ("débil", "moderada", "fuerte"), PAL.niveles))
+AZUL = PAL.azul
 
 lluvia_obs, av = C.vipnet_seguro("precipitacion")
 avisos.extend(av)
@@ -57,18 +58,18 @@ with col_mapa:
     fmap.update_layout(map=dict(style="white-bg", center=dict(lat=-36.86, lon=-72.95), zoom=8.6,
                                 layers=[dict(sourcetype="raster", source=[F.ESRI], below="traces")]),
                        margin=dict(l=0, r=0, t=0, b=0), height=470, showlegend=False)
-    st.plotly_chart(fmap, config=barra("resetViewMap"), key="mapa_lluvia")
+    C.grafico(fmap, "mapa_lluvia", config=barra("resetViewMap"), key="mapa_lluvia")
     st.caption("Colores: < 25 · 25–50 · 50–75 · 75–100 · 100–150 · > 150 mm. Imagen: Esri World Imagery.")
     opciones = {"Grupos": None} | {s["nombre"].split(" (")[0]: s["id"] for s in activas}
     boton = st.pills("Ver", list(opciones), default="Grupos", required=True, key="estacion",
                       bind="query-params", label_visibility="collapsed")
 elegida = opciones.get(boton) if boton else None
 if elegida:
-    curvas = [(F.SITIO[elegida]["nombre"], [elegida], F.GRUPOS[F.SITIO[elegida]["grupo"]])]
+    curvas = [(F.SITIO[elegida]["nombre"], [elegida], PAL.grupos[F.SITIO[elegida]["grupo"]])]
 else:
     curvas = [(f"{g} ({sum(s['grupo'] == g for s in activas)} est.)",
                [s["id"] for s in activas if s["grupo"] == g], colg)
-              for g, colg in F.GRUPOS.items() if any(s["grupo"] == g for s in activas)]
+              for g, colg in PAL.grupos.items() if any(s["grupo"] == g for s in activas)]
 
 with col_graf:
     if P is None or P.empty:
@@ -90,7 +91,7 @@ with col_graf:
         fa.update_layout(title="Precipitación por hora (mm)", height=360, margin=dict(l=10, r=10, t=40, b=10),
                          bargap=0, legend=dict(orientation="h", y=-.3, yanchor="top"), hovermode="x unified")
         fa.update_xaxes(**EJE_T)
-        st.plotly_chart(fa, config=barra(), key="hist_lluvia")
+        C.grafico(fa, f"lluvia_por_hora_{sitio['id']}", key="hist_lluvia")
 
         A = F.percentiles(P.fillna(0).cumsum())
         fb = go.Figure()
@@ -110,7 +111,7 @@ with col_graf:
                          height=290, margin=dict(l=10, r=10, t=60, b=10), showlegend=False,
                          hovermode="x unified")
         fb.update_xaxes(**EJE_T)
-        st.plotly_chart(fb, config=barra(), key="acum_lluvia")
+        C.grafico(fb, f"lluvia_acumulada_{sitio['id']}", key="acum_lluvia")
 
 if P is not None and not P.empty:
     st.markdown("**Lluvia esperada cada 6 horas** (mediana del pronóstico; rango p10–p90)")
@@ -129,7 +130,7 @@ if P is not None and not P.empty:
         obs_txt = ""
         if pasado_b:
             partes = []
-            for g, colg in F.GRUPOS.items():
+            for g, colg in PAL.grupos.items():
                 v = [float(lluvia_obs[s["id"]][(lluvia_obs[s["id"]].index > b0) &
                                                (lluvia_obs[s["id"]].index <= b1)].sum())
                      for s in activas if s["grupo"] == g]
@@ -139,15 +140,15 @@ if P is not None and not P.empty:
             obs_txt = "<br>".join(partes)
         fin_h = "24" if b1.hour == 0 else f"{b1:%H}"
         html.append(
-            f'<div style="flex:1 1 92px;max-width:130px;border:{"2px solid " + ROJO if actual else "1px solid #D6D2CA"};'
+            f'<div style="flex:1 1 92px;max-width:130px;border:{"2px solid " + ROJO if actual else "1px solid rgba(128,128,128,.35)"};'
             f'border-radius:10px;padding:8px 6px;text-align:center;opacity:{.55 if pasado_b else 1};'
             f'font-family:sans-serif">'
             f'<div style="font-weight:700">{DIAS[b0.weekday()].capitalize()} {b0.day}</div>'
-            f'<div style="font-size:12px;color:#666">{b0:%H}–{fin_h} h</div>'
+            f'<div style="font-size:12px;opacity:.7">{b0:%H}–{fin_h} h</div>'
             f'<div style="font-size:26px;font-weight:800;color:{color}">{q50:.0f}</div>'
-            f'<div style="font-size:11px;color:#666">mm · {q10:.0f}–{q90:.0f}</div>'
+            f'<div style="font-size:11px;opacity:.7">mm · {q10:.0f}–{q90:.0f}</div>'
             f'<div style="font-size:11px;margin-top:4px;font-weight:700">{obs_txt}</div>'
-            + (f'<div style="font-size:11px;color:#5B4B8A">ráfaga {rf:.0f} km/h</div>'
+            + (f'<div style="font-size:11px;color:{PAL.rafaga}">ráfaga {rf:.0f} km/h</div>'
                if rf is not None and not np.isnan(rf) and not pasado_b else "")
             + (f"<div style='font-size:10px;color:white;background:{ROJO};border-radius:4px;margin-top:4px'>"
                "AHORA</div>" if actual else "")

@@ -25,6 +25,15 @@ Se actualiza sola y no necesita claves ni base de datos: las observaciones se de
 
 Los modelos se consultan en las coordenadas del sitio elegido en la barra lateral.
 
+Bajo cada gráfico hay dos botones para **descargarlo en PNG** (2800 px de ancho) **o PDF** (vectorial, con texto
+editable), con el logo de MetGeo y los colores del modo en que se estaba viendo. Los dibuja
+[kaleido](https://github.com/plotly/Kaleido), que necesita Chrome o Chromium: en Streamlit Community Cloud lo
+instala `packages.txt`; en tu computador sirve el Chrome que ya tengas.
+
+La app sigue el **modo claro u oscuro del navegador** (`[theme.light]` y `[theme.dark]` en
+`.streamlit/config.toml`). Logos, colores de los gráficos y tarjetas se eligen en `comun.paleta()`; los logos de
+trazo claro (`static/*_claro.svg`) son los del modo oscuro.
+
 ## Fuentes (todas públicas)
 
 | Fuente | Variables | Cobertura |
@@ -65,14 +74,16 @@ basta reactivarla desde la misma pestaña.
 app.py                     punto de entrada: st.App que mantiene la caché caliente
 streamlit_app.py           navegación (st.navigation), controles de la barra lateral y encabezado
 app_pages/                 una página por vista: presentación, comparar, lluvia, meteograma, mapa
-comun.py                   cargas con caché y utilidades compartidas por las páginas
+comun.py                   cargas con caché, modo claro/oscuro y descargas PNG/PDF
 fuentes.py                 descarga y ordena los datos; catálogo de variables, modelos y estaciones
 actualiza_pronosticos.py   baja los pronósticos de todos los sitios (lo corre la GitHub Action)
 tests/                     pruebas de humo con st.testing.AppTest
 .github/workflows/         Actions: pronósticos cada hora y pruebas en cada push
 .streamlit/                tema, archivos estáticos y configuración de la caché
-static/                    foto de portada (cerro Caracol) y logos de MetGeo, servidos en app/static/
-requirements.txt           dependencias
+static/                    foto de portada (cerro Caracol) y logos de MetGeo en SVG, servidos en app/static/
+requirements.txt           dependencias de Python
+packages.txt               Chromium para exportar gráficos en Streamlit Community Cloud
+VERSION, CHANGELOG.md      versión actual y registro de cambios
 ```
 
 ## Velocidad
@@ -115,6 +126,26 @@ Para usar una copia local de los pronósticos (por ejemplo, recién generada con
 3. Elegir la URL (por ejemplo `monitor-meteo-concepcion.streamlit.app`) y *Deploy*.
 
 La app se duerme tras unos días sin visitas; la primera visita la despierta.
+
+## Versiones
+
+La versión vigente está en `VERSION` y se muestra al pie de la app; cada cambio queda en
+[`CHANGELOG.md`](CHANGELOG.md) (versionado semántico: parche para correcciones, menor para funciones nuevas,
+mayor para cambios que rompen enlaces o fuentes). Para publicar una versión:
+
+1. Mientras trabajas, anota los cambios bajo `## [Sin publicar]` en `CHANGELOG.md`.
+2. Al cerrar la versión, cambia ese título por `## [X.Y.Z] - AAAA-MM-DD`, deja un `## [Sin publicar]` vacío
+   encima, actualiza los enlaces del final y escribe `X.Y.Z` en `VERSION` (una prueba revisa que coincidan).
+3. Haz commit, etiqueta y sube:
+
+   ```bash
+   git commit -am "Versión X.Y.Z"
+   git tag -a vX.Y.Z -m "Versión X.Y.Z"
+   git push origin main vX.Y.Z
+   ```
+
+La Action [`version.yml`](.github/workflows/version.yml) crea entonces la versión en la pestaña *Releases* de
+GitHub con sus notas del registro de cambios.
 
 ## Autoría y licencia
 

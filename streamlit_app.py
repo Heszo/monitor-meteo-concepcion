@@ -15,7 +15,7 @@ import comun as C
 
 st.set_page_config(page_title="MetGeo Concepción · monitor meteorológico", page_icon=str(C.LOGO_SOLO),
                    layout="wide")
-st.logo(str(C.LOGO_COMPLETO), icon_image=str(C.LOGO_SOLO), size="large")
+C.logo()
 
 INICIO = st.Page("app_pages/presentacion.py", title="Home", icon=":material/home:", default=True)
 pagina = st.navigation([
@@ -37,6 +37,7 @@ pagina.run()
 
 if pagina.title != INICIO.title:  # la portada ya trae su propia firma
     st.space("large")
-    st.caption("MetGeo Concepción · Bruno Herrera · [Instagram](" + C.INSTAGRAM + ") · [LinkedIn](" + C.LINKEDIN +
-               ") · [github.com/Heszo](https://github.com/Heszo) · "
-               "[código abierto](https://github.com/Heszo/monitor-meteo-concepcion)", text_alignment="center")
+    st.caption(f"MetGeo Concepción · Bruno Herrera · [Instagram]({C.INSTAGRAM}) · [LinkedIn]({C.LINKEDIN}) · "
+               f"[github.com/Heszo](https://github.com/Heszo) · "
+               f"[código abierto]({C.REPO}) · [v{C.VERSION}]({C.REPO}/blob/main/CHANGELOG.md)",
+               text_alignment="center")

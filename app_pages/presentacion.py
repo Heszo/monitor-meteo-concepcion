@@ -7,8 +7,9 @@ from plotly.subplots import make_subplots
 
 import comun as C
 import fuentes as F
-from comun import BANDA, DIAS, EJE_T, NEGRO, ROJO, barra, fmt, linea_ahora, nombre_modelo
+from comun import BANDA, DIAS, EJE_T, ROJO, barra, fmt, linea_ahora, nombre_modelo
 
+PAL = C.paleta()
 
 FOTO_PORTADA = "app/static/caracol.jpg"  # cerro Caracol, Concepción (servida desde static/)
 TARJETAS = [
@@ -73,14 +74,14 @@ if not temp.empty:
     if pron["pp"] is not None:
         q = F.percentiles(ventana(pron["pp"]))
         fp.add_trace(go.Bar(x=q.index - pd.Timedelta(minutes=30), y=q.p50, width=3.6e6 * 0.85,
-                            marker_color="#6FA3D2", name="lluvia esperada (mm/h)", opacity=.45),
+                            marker_color=PAL.lluvia_esp, name="lluvia esperada (mm/h)", opacity=.45),
                      secondary_y=True)
     # lluvia observada encima, más angosta y opaca, para contrastarla con la esperada
     ll_obs = observado(sitio, "precipitacion")
     if ll_obs is not None:
         ll_obs = ll_obs[ll_obs.index > ahora_h - pd.Timedelta(hours=24)]
         fp.add_trace(go.Bar(x=ll_obs.index - pd.Timedelta(minutes=30), y=ll_obs.values, width=3.6e6 * 0.5,
-                            marker_color="#1F4E8C", name="lluvia observada (mm/h)", opacity=.9),
+                            marker_color=PAL.lluvia_obs, name="lluvia observada (mm/h)", opacity=.9),
                      secondary_y=True)
     tv = ventana(temp).median(axis=1)
     fp.add_trace(go.Scatter(x=tv.index, y=tv.values, line=dict(color="#d6604d", width=3),
@@ -88,7 +89,7 @@ if not temp.empty:
     o = observado(sitio, "temperatura")
     if o is not None:
         o = o[o.index > ahora_h - pd.Timedelta(hours=24)]
-        fp.add_trace(go.Scatter(x=o.index, y=o.values, line=dict(color=NEGRO, width=2.4),
+        fp.add_trace(go.Scatter(x=o.index, y=o.values, line=dict(color=PAL.tinta, width=2.4),
                                 name="temperatura observada (°C)"), secondary_y=False)
     linea_ahora(fp, pd.Timestamp(ahora))
     fp.update_yaxes(title_text="°C", secondary_y=False)
@@ -101,7 +102,7 @@ if not temp.empty:
                      margin=dict(l=10, r=10, t=45, b=10), hovermode="x unified", bargap=0, barmode="overlay",
                      legend=dict(orientation="h", y=-0.25, yanchor="top"))
     fp.update_xaxes(**EJE_T)
-    st.plotly_chart(fp, config=barra(), key="adelanto")
+    C.grafico(fp, f"proximos_dias_{sitio['id']}", key="adelanto")
     st.caption("El sitio se cambia arriba, en «Sitio». La línea punteada roja marca la hora actual.")
 
 # --- qué se puede hacer
@@ -118,7 +119,7 @@ st.subheader("Cómo funciona", icon=":material/settings_suggest:", anchor=False)
 col_red, col_pasos = st.columns([5, 6], gap="large")
 with col_red:
     fred = go.Figure()
-    for g, color in F.GRUPOS.items():
+    for g, color in PAL.grupos.items():
         ss = [x for x in F.SITIOS if x["grupo"] == g]
         fred.add_trace(go.Scattermap(lat=[x["lat"] for x in ss], lon=[x["lon"] for x in ss], mode="markers",
                                      marker=dict(size=13, color=color), name=g,
@@ -126,8 +127,8 @@ with col_red:
     fred.update_layout(map=dict(style="white-bg", center=dict(lat=-36.86, lon=-72.95), zoom=8.3,
                                 layers=[dict(sourcetype="raster", source=[F.ESRI], below="traces")]),
                        margin=dict(l=0, r=0, t=0, b=0), height=380,
-                       legend=dict(orientation="h", y=0.02, x=0.02, bgcolor="rgba(255,255,255,.85)"))
-    st.plotly_chart(fred, config=barra("resetViewMap"), key="mapa_red")
+                       legend=dict(orientation="h", y=0.02, x=0.02, bgcolor=PAL.fondo_leyenda))
+    C.grafico(fred, "red_de_estaciones", config=barra("resetViewMap"), key="mapa_red")
     st.caption("La red: 16 estaciones VIPNet y el aeropuerto Carriel Sur, agrupadas en costa, ciudad e "
                "interior. Imagen: Esri World Imagery.")
 with col_pasos:
@@ -146,7 +147,7 @@ with col_pasos:
             f'<div style="flex:0 0 2.4rem;height:2.4rem;border-radius:50%;background:#004090;color:white;'
             f'font-weight:800;display:flex;align-items:center;justify-content:center">{n}</div>'
             f'<div><div style="font-weight:700;font-size:1.05rem">{titulo}</div>'
-            f'<div style="color:#444;line-height:1.5">{texto}</div></div></div>', unsafe_allow_html=True)
+            f'<div style="opacity:.8;line-height:1.5">{texto}</div></div></div>', unsafe_allow_html=True)
 
 # --- fuentes y advertencias
 st.subheader("Fuentes y advertencias", icon=":material/fact_check:", anchor=False)
@@ -172,11 +173,12 @@ col_c.markdown("""
 # --- autoría
 st.space("medium")
 with st.container(horizontal=True, vertical_alignment="center", gap="large"):
-    st.image(str(C.LOGO_COMPLETO), width=300)
+    st.image(str(PAL.logo), width=300)
     st.markdown(
         "Hecho por **Bruno Herrera** · MetGeo Spa  \n"
-        ":material/code: [github.com/Heszo](https://github.com/Heszo) · código abierto (MIT) en "
-        "[github.com/Heszo/monitor-meteo-concepcion](https://github.com/Heszo/monitor-meteo-concepcion)")
+        f":material/code: [github.com/Heszo](https://github.com/Heszo) · código abierto (MIT) en "
+        f"[github.com/Heszo/monitor-meteo-concepcion]({C.REPO}) · "
+        f"[versión {C.VERSION}]({C.REPO}/blob/main/CHANGELOG.md)")
     with st.container(horizontal=True, gap="small", width="content"):
         st.link_button("Instagram @metgeo.spa", C.INSTAGRAM, icon=":material/photo_camera:")
         st.link_button("LinkedIn MetGeo Spa", C.LINKEDIN, icon=":material/work:")

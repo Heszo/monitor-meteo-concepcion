@@ -61,3 +61,14 @@ def test_presentacion_enlaza_cada_pagina():
     at = abre()
     enlaces = {e.proto.page for e in at.get("page_link")}  # url_path de cada página
     assert set(PAGINAS[1:]) <= enlaces
+
+
+def test_version_en_changelog():
+    """VERSION y la última versión de CHANGELOG.md deben coincidir (la Action de versiones lo exige)."""
+    import re
+    from pathlib import Path
+
+    raiz = Path(__file__).resolve().parents[1]
+    version = (raiz / "VERSION").read_text().strip()
+    publicadas = re.findall(r"^## \[(\d+\.\d+\.\d+)\]", (raiz / "CHANGELOG.md").read_text(), re.M)
+    assert publicadas and publicadas[0] == version, (version, publicadas[:1])

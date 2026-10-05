@@ -58,6 +58,46 @@ def paleta():
     return OSCURO if st.context.theme.type == "dark" else CLARO
 
 
+# Cambiar el tema a mano (menú ⋮ → Settings) no vuelve a correr el script, así que los gráficos quedaban con los
+# colores del modo anterior. Este componente invisible mira el fondo de la app y, si no coincide con el modo con
+# que se dibujó, pide un rerun; el navegador manda el modo nuevo con ese rerun y st.context.theme se actualiza.
+_VIGIA_JS = """
+export default function ({ data, setTriggerValue }) {
+    const modo = () => {
+        const app = document.querySelector('.stApp') || document.body;
+        const m = getComputedStyle(app).backgroundColor.match(/\\d+(\\.\\d+)?/g);
+        if (!m) return null;
+        const [r, g, b] = m.map(Number);
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.5 ? 'dark' : 'light';
+    };
+    let pedido = null;  // un solo rerun por cambio, para no entrar en bucle si el servidor no se entera
+    const revisa = () => {
+        const actual = modo();
+        if (actual && actual !== data.tema && actual !== pedido) {
+            pedido = actual;
+            setTriggerValue('cambio', actual);
+        }
+    };
+    revisa();
+    const reloj = setInterval(revisa, 400);
+    return () => clearInterval(reloj);
+}
+"""
+
+_vigias = {}  # montador del componente por runtime (las pruebas crean uno nuevo por app sin reimportar este módulo)
+
+
+def vigila_tema():
+    """Vuelve a dibujar la página cuando el tema cambia a mano. Va una vez por corrida, arriba de la página."""
+    from streamlit.components.v2.get_bidi_component_manager import get_bidi_component_manager
+
+    registro = id(get_bidi_component_manager())
+    if registro not in _vigias:
+        _vigias[registro] = st.components.v2.component("vigia_tema", js=_VIGIA_JS)
+    _vigias[registro](key="vigia_tema", data={"tema": st.context.theme.type or "light"}, height=0,
+                      on_cambio_change=lambda: None)
+
+
 # ------------------------------------------------------------------ cargas con caché
 # Las funciones con caché lanzan la excepción (así no se guarda una falla) y quien las
 # llama la atrapa.

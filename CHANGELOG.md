@@ -17,7 +17,8 @@ Cómo publicar una versión: ver «Versiones» en el [README](README.md#versione
 ### Agregado
 - Descarga de cada gráfico en PNG (alta resolución) o PDF vectorial, con el logo de MetGeo.
 - Modo oscuro: la app sigue el modo claro u oscuro del navegador, con logos claros para fondo oscuro y
-  colores de gráficos y tarjetas ajustados a cada modo.
+  colores de gráficos y tarjetas ajustados a cada modo. Si el tema se cambia a mano (menú ⋮ → Settings), la
+  página se vuelve a dibujar con los colores del modo elegido.
 - Logos de MetGeo en SVG (vectoriales), en versión para fondo claro y para fondo oscuro.
 - Número de versión al pie de la app, este registro de cambios y publicación automática de versiones en GitHub.
 

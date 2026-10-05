@@ -16,6 +16,7 @@ import comun as C
 st.set_page_config(page_title="MetGeo Concepción · monitor meteorológico", page_icon=str(C.LOGO_SOLO),
                    layout="wide")
 C.logo()
+C.vigila_tema()
 
 INICIO = st.Page("app_pages/presentacion.py", title="Home", icon=":material/home:", default=True)
 pagina = st.navigation([

@@ -39,7 +39,8 @@ pagina.run()
 
 if pagina.title != INICIO.title:  # la portada ya trae su propia firma
     st.space("large")
+    with st.container(horizontal=True, horizontal_alignment="center", gap="small"):
+        st.link_button("metgeo.cl", C.METGEO, icon=":material/public:")
+        st.link_button("Suscríbete al newsletter", C.NEWSLETTER, icon=":material/mail:", type="primary")
     st.caption(f"MetGeo Concepción · Bruno Herrera · [Instagram]({C.INSTAGRAM}) · [LinkedIn]({C.LINKEDIN}) · "
-               f"[github.com/Heszo](https://github.com/Heszo) · "
-               f"[código abierto]({C.REPO}) · [v{C.VERSION}]({C.REPO}/blob/main/CHANGELOG.md)",
-               text_alignment="center")
+               f"v{C.VERSION}", text_alignment="center")

@@ -35,6 +35,8 @@ VIEJO = pd.Timedelta(hours=3)
 INSTAGRAM = "https://www.instagram.com/metgeo.spa/"
 LINKEDIN = "https://www.linkedin.com/company/metgeo-spa/"
 REPO = "https://github.com/Heszo/monitor-meteo-concepcion"
+METGEO = "https://metgeo.cl"
+NEWSLETTER = "https://metgeo-newsletter.metgeo.workers.dev/"
 
 
 # ------------------------------------------------------------------ modo claro / oscuro
@@ -310,9 +312,10 @@ def exporta(fig, formato, oscuro):
         return f.to_image(format=formato, width=ANCHO_EXPORTA, height=alto, scale=2 if formato == "png" else 1)
 
 
-def grafico(fig, nombre, config=None, key=None):
-    """st.plotly_chart más los botones para descargar la figura en PNG o PDF. 'nombre' va en el archivo."""
-    st.plotly_chart(fig, config=config or barra(), key=key)
+def grafico(fig, nombre, config=None, key=None, **kw):
+    """st.plotly_chart más los botones para descargar la figura en PNG o PDF. 'nombre' va en el archivo;
+    'kw' pasa directo a st.plotly_chart (on_select, selection_mode)."""
+    st.plotly_chart(fig, config=config or barra(), key=key, **kw)
     oscuro = paleta().oscuro
     archivo = f"metgeo_{nombre}_{F.ahora_local():%Y%m%d_%H%M}"
     with st.container(horizontal=True, horizontal_alignment="right", gap="small"):

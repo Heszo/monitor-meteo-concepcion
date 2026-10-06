@@ -175,11 +175,10 @@ st.space("medium")
 with st.container(horizontal=True, vertical_alignment="center", gap="large"):
     st.image(str(PAL.logo), width=300)
     st.markdown(
-        "Hecho por **Bruno Herrera** · MetGeo Spa  \n"
-        f":material/code: [github.com/Heszo](https://github.com/Heszo) · código abierto (MIT) en "
-        f"[github.com/Heszo/monitor-meteo-concepcion]({C.REPO}) · "
-        f"[versión {C.VERSION}]({C.REPO}/blob/main/CHANGELOG.md)")
+        f"Hecho por **Bruno Herrera** · MetGeo Spa  \nversión {C.VERSION}")
     with st.container(horizontal=True, gap="small", width="content"):
+        st.link_button("Suscríbete al newsletter", C.NEWSLETTER, icon=":material/mail:", type="primary")
+        st.link_button("metgeo.cl", C.METGEO, icon=":material/public:")
         st.link_button("Instagram @metgeo.spa", C.INSTAGRAM, icon=":material/photo_camera:")
         st.link_button("LinkedIn MetGeo Spa", C.LINKEDIN, icon=":material/work:")
 st.caption(f"Consultado el {ahora:%d/%m/%Y %H:%M} (hora de Chile) · pronóstico: "

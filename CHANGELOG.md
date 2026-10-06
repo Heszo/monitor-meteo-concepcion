@@ -12,6 +12,21 @@ Cómo publicar una versión: ver «Versiones» en el [README](README.md#versione
 
 ## [Sin publicar]
 
+### Agregado
+- Lluvia: la estación se elige pinchando el mapa o en el botón «Estación», que las agrupa en costa, ciudad e
+  interior. La estación elegida pasa a ser el «Sitio» de toda la app (pronóstico y tarjetas de arriba).
+- Lluvia: selector «Estación / Por grupo». «Por grupo» muestra lo observado y el super-ensamble de cada grupo
+  (promedio miembro a miembro de sus estaciones, desde la copia publicada) junto al de la estación elegida.
+- Botones a metgeo.cl y al newsletter de MetGeo en el Home y al pie de cada página.
+
+### Cambiado
+- Mapa de lluvia: anillo del color del grupo, puntos más chicos, halo blanco en la estación elegida y una
+  leyenda pequeña dentro del mapa en vez del texto largo bajo él.
+- El pie de página ya no enlaza a GitHub ni al código; conserva la versión.
+
+### Eliminado
+- El parámetro `?estacion=` de la página de lluvia; la estación va en `?sitio=`.
+
 ## [1.1.1] - 2026-10-05
 
 ### Corregido

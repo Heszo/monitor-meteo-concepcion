@@ -24,6 +24,7 @@ Cómo publicar una versión: ver «Versiones» en el [README](README.md#versione
 ### Cambiado
 - Los mapas satelitales tienen esquinas redondeadas y un filete gris fino, igual en modo claro y oscuro; las
   descargas PNG/PDF de los mapas llevan ese mismo filete.
+- La barra superior va sin el botón *Deploy* ni el menú ⋮: el modo claro u oscuro lo decide el navegador.
 
 ## [1.1.0] - 2026-10-05
 

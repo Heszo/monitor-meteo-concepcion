@@ -58,7 +58,7 @@ def paleta():
     return OSCURO if st.context.theme.type == "dark" else CLARO
 
 
-# Cambiar el tema a mano (menú ⋮ → Settings) no vuelve a correr el script, así que los gráficos quedaban con los
+# Que el navegador cambie de modo con la app abierta no vuelve a correr el script, así que los gráficos quedaban con los
 # colores del modo anterior. Este componente invisible mira el fondo de la app y, si no coincide con el modo con
 # que se dibujó, pide un rerun; el navegador manda el modo nuevo con ese rerun y st.context.theme se actualiza.
 _VIGIA_JS = """

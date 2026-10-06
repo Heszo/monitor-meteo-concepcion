@@ -32,9 +32,10 @@ instala `packages.txt`; en tu computador sirve el Chrome que ya tengas.
 
 La app sigue el **modo claro u oscuro del navegador** (`[theme.light]` y `[theme.dark]` en
 `.streamlit/config.toml`). Logos, colores de los gráficos y tarjetas se eligen en `comun.paleta()`; los logos de
-trazo claro (`static/*_claro.svg`) son los del modo oscuro. Como cambiar el tema a mano (menú ⋮ → Settings) no
-vuelve a correr el script, `comun.vigila_tema()` lo detecta en el navegador y pide un rerun para redibujar los
-gráficos con los colores nuevos.
+trazo claro (`static/*_claro.svg`) son los del modo oscuro. Si el sistema cambia de modo con la app abierta, eso
+no vuelve a correr el script: `comun.vigila_tema()` lo detecta en el navegador y pide un rerun para redibujar los
+gráficos con los colores nuevos. La barra superior va sin el botón *Deploy* ni el menú ⋮
+(`toolbarMode = "minimal"` en `.streamlit/config.toml`).
 
 ## Fuentes (todas públicas)
 
